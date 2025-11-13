@@ -1,0 +1,39 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: white;
+  padding: 1rem;
+  width: 600px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px #00000055;
+}
+
+.modal-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-header input {
+  flex-grow: 1;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.modal-header button {
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
