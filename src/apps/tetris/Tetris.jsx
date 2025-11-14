@@ -12,7 +12,7 @@ import TouchControls from './components/TouchControls';
 import Leaderboard   from './components/Leaderboard';
 
 import ScoreModal               from './components/ScoreModal';
-import { submitScore }          from './api/apitetris';
+import { saveScore }            from './api/apitetris';
 
 /* ---------- estilos ---------- */
 const Wrapper = styled.div`
@@ -63,8 +63,11 @@ const Tetris = () => {
   const [paused, setPaused] = useState(false);
   const [gameOver, setGameOver] = useState(false);
 
-  const [showModal, setShowModal] = useState(false); // ✅ NUEVO
-  const [scoreSaved, setScoreSaved] = useState(false); // ✅ NUEVO
+  const [showModal, setShowModal] = useState(false);
+  const [scoreSaved, setScoreSaved] = useState(false);
+  const [savingScore, setSavingScore] = useState(false);
+  const [scoreError, setScoreError] = useState(null);
+  const [leaderboardRefreshToken, setLeaderboardRefreshToken] = useState(0);
 
   /* jugador */
   const [
@@ -155,13 +158,13 @@ const Tetris = () => {
     setScore(0);
     setLines(0);
     setLevel(0);
-    setScoreSaved(false); // ✅ Reinicio modal
+    setScoreSaved(false);
+    setScoreError(null);
     lockStartRef.current = null;
     resetPlayer();
     setStage(createStage());
   };
 
-  // ✅ Mostrar modal SOLO si gameOver + score >= 100 + no guardado
   useEffect(() => {
     if (gameOver && score >= 100 && !scoreSaved) {
       setShowModal(true);
@@ -169,14 +172,19 @@ const Tetris = () => {
   }, [gameOver, score, scoreSaved]);
 
   const handleGuardarPuntuacion = async (username) => {
+    if (!username) return;
     try {
-      await submitScore({ username, score });
-      console.log('✅ Puntuación guardada');
+      setSavingScore(true);
+      setScoreError(null);
+      await saveScore(username, score);
       setScoreSaved(true);
       setShowModal(false);
+      setLeaderboardRefreshToken((prev) => prev + 1);
     } catch (error) {
       console.error('❌ Error al guardar puntuación', error);
+      setScoreError('Error al guardar la puntuación. Intenta de nuevo.');
     }
+    setSavingScore(false);
   };
 
   useEffect(() => {
@@ -231,12 +239,14 @@ const Tetris = () => {
         )}
       </GameArea>
   
-      {!gameStarted && <Leaderboard />}
+      {!gameStarted && <Leaderboard refreshToken={leaderboardRefreshToken} />}
   
       {showModal && (
         <ScoreModal
           score={score}
           onSave={handleGuardarPuntuacion}
+          loading={savingScore}
+          errorMessage={scoreError}
         />
       )}
     </Wrapper>

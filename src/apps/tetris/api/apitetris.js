@@ -1,41 +1,29 @@
-// src/apps/tetris/api/tetris.js
-import axios from 'axios';
+const API_BASE_URL = '/api';
 
-const DEFAULT_BASE_URL = 'http://localhost:3000';
-
-const guessApiBase = () => {
-  if (typeof window === 'undefined') return DEFAULT_BASE_URL;
-
-  const { protocol, hostname } = window.location;
-
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return DEFAULT_BASE_URL;
+const handleResponse = async (res, errorMessage) => {
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${errorMessage}: ${res.status} ${text}`);
   }
-
-  return `${protocol}//${hostname}:3000`;
+  return res.json();
 };
 
-const resolveBaseUrl = () => {
-  const configured = import.meta.env.VITE_TETRIS_API_BASE;
-  if (configured) return configured.replace(/\/$/, '');
-  return guessApiBase().replace(/\/$/, '');
-};
+export async function getLeaderboard() {
+  const res = await fetch(`${API_BASE_URL}/leaderboard`);
+  return handleResponse(res, 'Error al obtener el leaderboard');
+}
 
-const API_BASE = resolveBaseUrl();
+export async function saveScore(username, score) {
+  const res = await fetch(`${API_BASE_URL}/score`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, score }),
+  });
+  return handleResponse(res, 'Error al guardar la puntuación');
+}
 
-const withPath = (path) => `${API_BASE}${path}`;
-
-export const fetchLeaderboard = async () => {
-  const res = await axios.get(withPath('/api/leaderboard'));
-  return res.data;
-};
-
-export const submitScore = async ({ username, score }) => {
-  const res = await axios.post(
-    withPath('/api/score'),
-    { username, score },
-    { headers: { 'Content-Type': 'application/json' } },
-  );
-  return res.data;
+export const apiClient = {
+  getLeaderboard,
+  saveScore,
 };
 

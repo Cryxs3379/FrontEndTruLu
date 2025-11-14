@@ -21,13 +21,12 @@ const modalStyles = {
   }
 };
 
-export default function ScoreModal({ score, onSave }) {
+export default function ScoreModal({ score, onSave, loading = false, errorMessage = null }) {
   const [name, setName] = useState('');
 
   const handleSubmit = () => {
-    if (name.trim()) {
-      onSave(name);
-    }
+    if (!name.trim() || loading) return;
+    onSave(name.trim());
   };
 
   return (
@@ -42,8 +41,9 @@ export default function ScoreModal({ score, onSave }) {
           onChange={(e) => setName(e.target.value)}
           style={modalStyles.input}
         />
-        <button onClick={handleSubmit} style={modalStyles.button}>
-          Guardar Puntuación
+        {errorMessage && <p style={{ color: 'red', marginBottom: '1rem' }}>{errorMessage}</p>}
+        <button onClick={handleSubmit} style={modalStyles.button} disabled={loading}>
+          {loading ? 'Guardando...' : 'Guardar Puntuación'}
         </button>
       </div>
     </div>

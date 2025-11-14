@@ -1,7 +1,7 @@
 // src/apps/tetris/components/Leaderboard.js
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { fetchLeaderboard } from '../api/apitetris';
+import { getLeaderboard } from '../api/apitetris';
 
 // ✨ Animación de brillo
 const glow = keyframes`
@@ -50,26 +50,45 @@ const Entry = styled.div`
   }
 `;
 
-const Leaderboard = () => {
+const Leaderboard = ({ refreshToken = 0 }) => {
   const [scores, setScores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchScores = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const data = await fetchLeaderboard();
-        setScores(data.slice(0, 10));
+        const data = await getLeaderboard();
+        if (isMounted) {
+          setScores(data.slice(0, 10));
+        }
       } catch (err) {
         console.error('Error fetching scores:', err);
+        if (isMounted) {
+          setError('Error al cargar el ranking. Intenta de nuevo.');
+          setScores([]);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchScores();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshToken]);
 
   return (
     <BoardContainer>
       <Title>🏆 HALL OF FAME</Title>
-      {scores.map((entry, i) => (
+      {loading && <p>Cargando ranking…</p>}
+      {error && <p>{error}</p>}
+      {!loading && !error && scores.length === 0 && <p>No hay puntuaciones aún.</p>}
+      {!loading && !error && scores.map((entry, i) => (
         <Entry key={entry.id ?? `${entry.username}-${entry.created_at}`}>
           <span>{i + 1}. {(entry.username || 'ANON').toUpperCase()}</span>
           <span>{entry.score}</span>
