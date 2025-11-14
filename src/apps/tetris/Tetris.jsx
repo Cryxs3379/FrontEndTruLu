@@ -12,7 +12,7 @@ import TouchControls from './components/TouchControls';
 import Leaderboard   from './components/Leaderboard';
 
 import ScoreModal               from './components/ScoreModal';
-import { crearPuntuacionTetris } from './api/apitetris';
+import { submitScore }          from './api/apitetris';
 
 /* ---------- estilos ---------- */
 const Wrapper = styled.div`
@@ -168,9 +168,9 @@ const Tetris = () => {
     }
   }, [gameOver, score, scoreSaved]);
 
-  const handleGuardarPuntuacion = async (nombre) => {
+  const handleGuardarPuntuacion = async (username) => {
     try {
-      await crearPuntuacionTetris({ nombre, puntuacion: score });
+      await submitScore({ username, score });
       console.log('✅ Puntuación guardada');
       setScoreSaved(true);
       setShowModal(false);

@@ -1,16 +1,41 @@
 // src/apps/tetris/api/tetris.js
 import axios from 'axios';
 
-//const API_BASE = 'http://localhost:10000/api/supabase';
-const API_BASE = 'https://trujillolucenabackend.onrender.com/api/supabase';
+const DEFAULT_BASE_URL = 'http://localhost:3000';
 
-export const getPuntuacionTetris = async () => {
-  const res = await axios.get(`${API_BASE}/tetris`);
+const guessApiBase = () => {
+  if (typeof window === 'undefined') return DEFAULT_BASE_URL;
+
+  const { protocol, hostname } = window.location;
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return DEFAULT_BASE_URL;
+  }
+
+  return `${protocol}//${hostname}:3000`;
+};
+
+const resolveBaseUrl = () => {
+  const configured = import.meta.env.VITE_TETRIS_API_BASE;
+  if (configured) return configured.replace(/\/$/, '');
+  return guessApiBase().replace(/\/$/, '');
+};
+
+const API_BASE = resolveBaseUrl();
+
+const withPath = (path) => `${API_BASE}${path}`;
+
+export const fetchLeaderboard = async () => {
+  const res = await axios.get(withPath('/api/leaderboard'));
   return res.data;
 };
 
-export const crearPuntuacionTetris = async (tetris) => {
-  const res = await axios.post(`${API_BASE}/tetris`, tetris);
+export const submitScore = async ({ username, score }) => {
+  const res = await axios.post(
+    withPath('/api/score'),
+    { username, score },
+    { headers: { 'Content-Type': 'application/json' } },
+  );
   return res.data;
 };
 

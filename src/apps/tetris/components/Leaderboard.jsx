@@ -1,7 +1,7 @@
 // src/apps/tetris/components/Leaderboard.js
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { getPuntuacionTetris } from '../api/apitetris';
+import { fetchLeaderboard } from '../api/apitetris';
 
 // ✨ Animación de brillo
 const glow = keyframes`
@@ -56,9 +56,8 @@ const Leaderboard = () => {
   useEffect(() => {
     const fetchScores = async () => {
       try {
-        const data = await getPuntuacionTetris();
-        const sorted = data.sort((a, b) => b.puntuacion - a.puntuacion);
-        setScores(sorted.slice(0, 5)); // Solo top 5
+        const data = await fetchLeaderboard();
+        setScores(data.slice(0, 10));
       } catch (err) {
         console.error('Error fetching scores:', err);
       }
@@ -71,9 +70,9 @@ const Leaderboard = () => {
     <BoardContainer>
       <Title>🏆 HALL OF FAME</Title>
       {scores.map((entry, i) => (
-        <Entry key={entry.id}>
-          <span>{i + 1}. {entry.nombre.toUpperCase()}</span>
-          <span>{entry.puntuacion}</span>
+        <Entry key={entry.id ?? `${entry.username}-${entry.created_at}`}>
+          <span>{i + 1}. {(entry.username || 'ANON').toUpperCase()}</span>
+          <span>{entry.score}</span>
         </Entry>
       ))}
     </BoardContainer>
