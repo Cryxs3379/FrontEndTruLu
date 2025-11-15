@@ -1,61 +1,66 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { likePelicula, removeLike } from '../api/api';
 
-const MovieCard = ({ pelicula }) => {
+const formatSize = (bytes) => {
+  if (!bytes && bytes !== 0) return 'Tamaño desconocido';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(1)} ${units[i]}`;
+};
+
+const MovieCard = ({ pelicula, onPlay, isPlaying = false }) => {
   const navigate = useNavigate();
-  const usuario = JSON.parse(localStorage.getItem('usuario'));
-  const likes = usuario?.peliculaslike || [];
-  const yaLeGusta = likes.some(p => p._id === pelicula._id);
 
   const handleClickDetalle = () => {
-    navigate(`/pelicula/${pelicula._id}`);
+    navigate(`/pelicula/${pelicula.id}`);
   };
 
-  const handleLikeToggle = async (e) => {
-    e.stopPropagation();
-
-    try {
-      let updatedUser;
-      if (yaLeGusta) {
-        updatedUser = await removeLike(usuario._id, pelicula);
-      } else {
-        updatedUser = await likePelicula(usuario._id, pelicula);
-      }
-
-      localStorage.setItem('usuario', JSON.stringify(updatedUser));
-      window.location.reload(); // hasta implementar estado global
-    } catch (err) {
-      console.error('❌ Error al actualizar like:', err);
-    }
+  const handlePlay = (event) => {
+    event.stopPropagation();
+    onPlay?.(pelicula);
   };
 
   return (
     <div
       className="card h-100 shadow-sm"
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', borderRadius: '14px', overflow: 'hidden' }}
       onClick={handleClickDetalle}
     >
-      <img
-        src={pelicula.imagen}
-        alt={pelicula.nombre}
-        className="card-img-top"
+      <div
         style={{
-          width: '70%',
-          display: 'block',
-          margin: '0 auto',
-          borderRadius: '10px 10px 0 0',
+          background: 'linear-gradient(135deg, #0f172a, #1d4ed8)',
+          color: '#fff',
+          minHeight: '180px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          padding: '1rem',
         }}
-      />
+      >
+        <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+          {pelicula.year || 'Sin año'}
+        </span>
+        <h5 style={{ marginBottom: 0 }}>{pelicula.title}</h5>
+      </div>
+
       <div className="card-body d-flex flex-column">
-        <h5 className="card-title">{pelicula.nombre}</h5>
-        <p className="card-text text-muted"><em>Haz clic para ver más</em></p>
+        <p className="mb-1 text-muted">
+          Archivo: <strong>{pelicula.filename}</strong>
+        </p>
+        <p className="mb-1 text-muted">
+          Peso: <strong>{formatSize(pelicula.size)}</strong>
+        </p>
+        <p className="text-muted mb-3">
+          Subido: {new Date(pelicula.created_at).toLocaleString()}
+        </p>
         <button
-          onClick={handleLikeToggle}
+          onClick={handlePlay}
           type="button"
-          className={`btn mt-auto ${yaLeGusta ? 'btn-danger' : 'btn-success'}`}
+          className="btn btn-primary mt-auto"
+          disabled={isPlaying}
         >
-          {yaLeGusta ? '💔 Quitar de Me gusta' : '❤️ Me gusta'}
+          {isPlaying ? 'Preparando vídeo…' : '▶️ Ver ahora'}
         </button>
       </div>
     </div>

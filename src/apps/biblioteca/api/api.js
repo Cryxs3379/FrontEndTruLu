@@ -1,32 +1,40 @@
 import axios from 'axios';
 
-//const API_BASE = 'http://localhost:10000/api';
-const API_BASE = 'https://trujillolucenabackend.onrender.com/api';
+const API_BASE = '/api';
 
-export const login = async (email, contrasena) => {
-  const res = await axios.post(`${API_BASE}/login`, { email, contrasena });
+const authClient = axios.create({
+  baseURL: API_BASE,
+});
+
+authClient.interceptors.request.use((config) => {
+  const stored = JSON.parse(localStorage.getItem('usuario'));
+  const token = stored?.token;
+  if (token) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return config;
+});
+
+export const login = async (email, password) => {
+  const res = await axios.post(`${API_BASE}/login`, { email, password });
   return res.data;
 };
 
-export const getPeliculas = async () => {
-  const res = await axios.get(`${API_BASE}/biblioteca`);
+export const getPeliculas = async (config = {}) => {
+  const res = await authClient.get('/biblioteca', config);
   return res.data;
 };
 
-export const likeMatrix = async (userId) => {
-    const res = await axios.put(`${API_BASE}/usuarios/${userId}/matrix`);
-    return res.data;
-  };
+export const streamPelicula = async (peliculaId, { signal } = {}) => {
+  const res = await authClient.get(`/biblioteca/${peliculaId}/stream`, {
+    responseType: 'blob',
+    signal,
+  });
+  return res.data;
+};
 
-  export const likePelicula = async (userId, pelicula) => {
-    const res = await axios.put(`${API_BASE}/usuarios/${userId}/like`, pelicula);
-    return res.data;
-  };
-
-  export const removeLike = async (userId, pelicula) => {
-    const res = await axios.delete(`${API_BASE}/usuarios/${userId}/like`, {
-      data: pelicula // 👈 se pasa en el body con método DELETE
-    });
-    return res.data;
-  };
+export const buildStreamUrl = (peliculaId) => `${API_BASE}/biblioteca/${peliculaId}/stream`;
  

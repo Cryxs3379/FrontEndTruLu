@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem('usuario');
     setUsuario(null);
   };
 

@@ -1,32 +1,98 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPeliculas } from '../api/api';
 import NavbarBiblioteca from '../layout/NavbarBiblioteca';
+import { getPeliculas, streamPelicula } from '../api/api';
+import { useAuth } from '../../../context/AuthContext';
 
 const PeliculaDetalle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [pelicula, setPelicula] = useState(null);
-  const [mostrarOpciones, setMostrarOpciones] = useState(false);
-
-  const usuario = JSON.parse(localStorage.getItem('usuario'));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [streaming, setStreaming] = useState(false);
+  const [streamError, setStreamError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchData = async () => {
-      const peliculas = await getPeliculas();
-      const peli = peliculas.find(p => p._id === id);
-      setPelicula(peli);
+      try {
+        setLoading(true);
+        const peliculas = await getPeliculas({ signal: controller.signal });
+        const peli = peliculas.find((p) => `${p.id}` === id);
+        if (isMounted) {
+          if (!peli) {
+            setError('Película no encontrada');
+          }
+          setPelicula(peli ?? null);
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        console.error('Error buscando película', err);
+        if (isMounted) setError('No pudimos cargar la información.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
+
     fetchData();
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [id]);
 
-  if (!pelicula) return <p className="p-4">Cargando...</p>;
+  useEffect(() => {
+    return () => {
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+    };
+  }, [videoUrl]);
 
-  const enlaceGoogle = `https://www.google.com/search?q=dónde+ver+${encodeURIComponent(pelicula.nombre)}`;
+  const handlePlay = async () => {
+    if (!pelicula) return;
 
-  const toggleOpciones = () => {
-    setMostrarOpciones(!mostrarOpciones);
+    try {
+      setStreaming(true);
+      setStreamError(null);
+      const blob = await streamPelicula(pelicula.id);
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      setVideoUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      console.error('Error reproduciendo película', err);
+      setStreamError('No se pudo reproducir esta película.');
+    } finally {
+      setStreaming(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <>
+        {usuario && <NavbarBiblioteca />}
+        <p className="p-4">Cargando...</p>
+      </>
+    );
+  }
+
+  if (error || !pelicula) {
+    return (
+      <>
+        {usuario && <NavbarBiblioteca />}
+        <div className="container py-4">
+          <div className="alert alert-warning d-flex justify-content-between align-items-center">
+            <span>{error || 'Película no disponible.'}</span>
+            <button className="btn btn-outline-secondary btn-sm" onClick={() => navigate(-1)}>
+              Volver
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -40,87 +106,52 @@ const PeliculaDetalle = () => {
             ⬅️ Volver
           </button>
 
-          <div className="row align-items-start">
-            {/* Imagen de la película */}
-            <div className="col-md-4 text-center">
-              <img
-                src={pelicula.imagen}
-                alt={pelicula.nombre}
-                className="img-fluid rounded mb-3"
+          <div className="row">
+            <div className="col-md-5">
+              <div
                 style={{
-                  maxHeight: '400px',
-                  objectFit: 'cover',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                  background: 'linear-gradient(135deg, #0f172a, #1d4ed8)',
+                  borderRadius: '16px',
+                  minHeight: '280px',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: '1.5rem',
+                  color: '#fff',
                 }}
-              />
+              >
+                <div>
+                  <span style={{ opacity: 0.8 }}>{pelicula.year || 'Sin año'}</span>
+                  <h3 className="mt-2">{pelicula.title}</h3>
+                  <p className="mb-0" style={{ fontSize: '0.9rem' }}>
+                    {pelicula.filename}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Información de la película */}
-            <div className="col-md-8">
-              <h2
-                style={{
-                  fontSize: '2.5rem',
-                  fontWeight: '700',
-                  marginBottom: '1rem'
-                }}
-              >
-                {pelicula.nombre}
-              </h2>
+            <div className="col-md-7">
+              <h2 className="mb-3">{pelicula.title}</h2>
+              <p><strong>Archivo:</strong> {pelicula.filename}</p>
+              <p><strong>Tamaño:</strong> {Math.round(pelicula.size / (1024 * 1024))} MB</p>
+              <p><strong>Fecha de alta:</strong> {new Date(pelicula.created_at).toLocaleString()}</p>
 
-              <p
-                style={{
-                  fontSize: '1.4rem',
-                  lineHeight: '1.6',
-                  marginBottom: '1rem'
-                }}
+              <button
+                className="btn btn-primary btn-lg mt-3"
+                onClick={handlePlay}
+                disabled={streaming}
               >
-                <strong>Sinopsis:</strong> {pelicula.sinopsis}
-              </p>
-
-              <p
-                style={{
-                  fontSize: '1.1rem',
-                  marginBottom: '2rem'
-                }}
-              >
-                <strong>Fecha de creación:</strong>{' '}
-                {new Date(pelicula.fecha_creacion).toLocaleDateString()}
-              </p>
+                {streaming ? 'Preparando video…' : '▶️ Reproducir'}
+              </button>
+              {streamError && <div className="alert alert-danger mt-3">{streamError}</div>}
             </div>
           </div>
         </div>
 
-        {/* Botón "Dónde ver" abajo y centrado */}
-        <div className="text-center mt-4">
-          <button
-            className="btn btn-primary btn-lg px-5 py-3"
-            onClick={toggleOpciones}
-            aria-expanded={mostrarOpciones}
-          >
-            📺 Dónde ver
-          </button>
-        </div>
-
-        {/* Sección de opciones */}
-        {mostrarOpciones && (
-          <div className="bg-white p-4 rounded shadow-sm mt-3">
-            <div className="bg-light p-3 rounded mb-3">
-              <strong>Ver legalmente:</strong>{' '}
-              <a
-                href={enlaceGoogle}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-success btn-sm ms-2"
-              >
-                Buscar en Google
-              </a>
-            </div>
-
-            <div className="bg-light p-3 rounded">
-              <strong>Ver menos legalmente:</strong>
-              <pre className="mt-2">
-                {JSON.stringify(pelicula.ver_menos_legalmente, null, 2)}
-              </pre>
+        {videoUrl && (
+          <div className="mt-4 card shadow-sm">
+            <div className="card-body">
+              <h5 className="mb-3">Reproduciendo ahora</h5>
+              <video key={videoUrl} src={videoUrl} controls className="w-100" style={{ borderRadius: '12px' }} />
             </div>
           </div>
         )}

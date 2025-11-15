@@ -1,23 +1,28 @@
 // Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../api/api';
+import { login as loginRequest } from '../api/api';
+import { useAuth } from '../../../context/AuthContext';
 
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const { login: setAuth } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await login(email, contrasena);
-      localStorage.setItem('usuario', JSON.stringify(user));
-      onLogin?.(user);
+      setError(null);
+      const data = await loginRequest(email, contrasena);
+      setAuth(data);
+      onLogin?.(data);
       navigate('/biblioteca');
     } catch (err) {
-      setError('Credenciales incorrectas');
+      const message =
+        err?.response?.data?.message || 'Credenciales incorrectas';
+      setError(message);
     }
   };
 
