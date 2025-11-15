@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   loginTruSound,
   logoutTruSound,
@@ -35,6 +35,9 @@ const TruSoundCloud = () => {
   const [tracks, setTracks] = useState([]);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [playQueue, setPlayQueue] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(null);
+  const audioRef = useRef(null);
   const [loadingArtists, setLoadingArtists] = useState(false);
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -175,9 +178,31 @@ const TruSoundCloud = () => {
     }
   };
 
-  const handlePlayTrack = (track) => {
-    setCurrentTrack(track);
-    setAudioUrl(buildTrackStreamUrl(track.id));
+  const playTrackAtIndex = (index, queue = playQueue) => {
+    if (!queue || index < 0 || index >= queue.length) return;
+    const nextTrack = queue[index];
+    setPlayQueue(queue);
+    setCurrentIndex(index);
+    setCurrentTrack(nextTrack);
+    setAudioUrl(buildTrackStreamUrl(nextTrack.id));
+  };
+
+  const handlePlayFromList = (list, index) => {
+    playTrackAtIndex(index, list);
+  };
+
+  const handleNextTrack = () => {
+    if (currentIndex == null || !playQueue.length) return;
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= playQueue.length) return;
+    playTrackAtIndex(nextIndex);
+  };
+
+  const handlePrevTrack = () => {
+    if (currentIndex == null || !playQueue.length) return;
+    const prevIndex = currentIndex - 1;
+    if (prevIndex < 0) return;
+    playTrackAtIndex(prevIndex);
   };
 
   const handleLogin = async ({ email, password }) => {
@@ -317,15 +342,22 @@ const TruSoundCloud = () => {
     selectedPlaylistScope === 'mine' &&
     selectedPlaylistDetail?.playlist?.user_id === session?.user?.id;
 
-  const renderTrackList = (list, { enableAdd = false, enableRemove = false } = {}) => (
+  const renderTrackList = (
+    list,
+    {
+      enableAdd = false,
+      enableRemove = false,
+      playSourceList = list,
+    } = {},
+  ) => (
     <div className="tracks-panel">
       {list.length === 0 && <p>No hay canciones disponibles.</p>}
-      {list.map((track) => (
+      {list.map((track, index) => (
         <TrackRow
           key={track.id}
           track={track}
           isActive={track.id === currentTrack?.id}
-          onPlay={handlePlayTrack}
+          onPlay={() => handlePlayFromList(playSourceList, index)}
           isFavorite={favoriteIds.has(track.id)}
           onToggleFavorite={handleToggleFavorite}
           onAddToPlaylist={
@@ -446,7 +478,7 @@ const TruSoundCloud = () => {
                 </div>
               )}
 
-              {renderTrackList(tracks, { enableAdd: true })}
+              {renderTrackList(tracks, { enableAdd: true, playSourceList: tracks })}
             </>
           )}
 
@@ -458,7 +490,10 @@ const TruSoundCloud = () => {
               {!loadingFavorites && favorites.length === 0 && (
                 <p>Todavía no tienes canciones favoritas.</p>
               )}
-              {renderTrackList(favorites, { enableAdd: true })}
+              {renderTrackList(favorites, {
+                enableAdd: true,
+                playSourceList: favorites,
+              })}
             </div>
           )}
 
@@ -568,6 +603,7 @@ const TruSoundCloud = () => {
                     {renderTrackList(playlistTracks, {
                       enableRemove: canEditPlaylist,
                       enableAdd: false,
+                      playSourceList: playlistTracks,
                     })}
                   </>
                 ) : (
@@ -623,7 +659,9 @@ const TruSoundCloud = () => {
                         </small>
                       </div>
                     </header>
-                    {renderTrackList(playlistTracks)}
+                    {renderTrackList(playlistTracks, {
+                      playSourceList: playlistTracks,
+                    })}
                   </>
                 ) : (
                   <p>Selecciona una playlist pública para ver su contenido.</p>
@@ -640,7 +678,36 @@ const TruSoundCloud = () => {
             <strong>{currentTrack.title}</strong>
             <span>{selectedArtist?.name}</span>
           </div>
-          <audio src={audioUrl} controls autoPlay preload="metadata" />
+          <div className="player-controls">
+            <button
+              type="button"
+              onClick={handlePrevTrack}
+              className="control-btn"
+              disabled={currentIndex === 0}
+            >
+              ⏮
+            </button>
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              controls
+              autoPlay
+              preload="metadata"
+              onEnded={handleNextTrack}
+            />
+            <button
+              type="button"
+              onClick={handleNextTrack}
+              className="control-btn"
+              disabled={
+                currentIndex == null ||
+                currentIndex >= playQueue.length - 1 ||
+                !playQueue.length
+              }
+            >
+              ⏭
+            </button>
+          </div>
         </footer>
       )}
 
@@ -875,6 +942,27 @@ const TruSoundCloud = () => {
 
         .player-bar audio {
           flex: 1;
+        }
+
+        .player-controls {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          width: 100%;
+        }
+
+        .control-btn {
+          background: rgba(255,255,255,0.1);
+          border: none;
+          color: #fff;
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1rem;
         }
 
         .ghost {
