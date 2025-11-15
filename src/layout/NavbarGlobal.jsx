@@ -30,6 +30,7 @@ const NavbarGlobal = () => {
         <NavItem to="/logincalendario"><span role="img" aria-label="Calendario">📅</span> Calendario</NavItem>
         <NavItem to="/rentacar"><span role="img" aria-label="Rentacar">🚗</span> Rentacar</NavItem>
         <NavItem to="/tetris"><span role="img" aria-label="Tetris">🧩</span> Tetris</NavItem>
+        <NavItem to="/trusound"><span role="img" aria-label="TruSound">🎧</span> TruSoundCloud</NavItem>
         <NavItem to="/miswebs"><span role="img" aria-label="miswebs">🧩</span> Mis Webs</NavItem>
       </nav>
 

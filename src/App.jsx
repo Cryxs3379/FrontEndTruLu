@@ -19,6 +19,7 @@ import Reservas from './apps/rentacar/pages/Reservas';
 import Garaje from './apps/rentacar/pages/Garaje';
 import NavbarRentacar from './apps/rentacar/components/NavbarRentacar';
 import MisWebs from './apps/miswebs/MisWebs';
+import TruSoundCloud from './apps/trusound/pages/TruSoundCloud';
 
 
 function AppWrapper() {
@@ -71,6 +72,7 @@ function AppWrapper() {
         </Route>
         <Route path="/tetris" element={<Tetris />} />
         <Route path="/MisWebs" element={<MisWebs />} />
+        <Route path="/trusound" element={<TruSoundCloud />} />
       </Routes>
     </BrowserRouter>
   );
