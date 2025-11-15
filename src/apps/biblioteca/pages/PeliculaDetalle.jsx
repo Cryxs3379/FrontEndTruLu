@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavbarBiblioteca from '../layout/NavbarBiblioteca';
-import { getPeliculas, streamPelicula } from '../api/api';
+import { getPeliculas, buildStreamUrl } from '../api/api';
 import { useAuth } from '../../../context/AuthContext';
 
 const PeliculaDetalle = () => {
@@ -46,21 +46,14 @@ const PeliculaDetalle = () => {
     };
   }, [id]);
 
-  useEffect(() => {
-    return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-    };
-  }, [videoUrl]);
-
   const handlePlay = async () => {
     if (!pelicula) return;
 
     try {
       setStreaming(true);
       setStreamError(null);
-      const blob = await streamPelicula(pelicula.id);
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      setVideoUrl(URL.createObjectURL(blob));
+      const url = buildStreamUrl(pelicula.id);
+      setVideoUrl(url);
     } catch (err) {
       console.error('Error reproduciendo película', err);
       setStreamError('No se pudo reproducir esta película.');
@@ -151,7 +144,14 @@ const PeliculaDetalle = () => {
           <div className="mt-4 card shadow-sm">
             <div className="card-body">
               <h5 className="mb-3">Reproduciendo ahora</h5>
-              <video key={videoUrl} src={videoUrl} controls className="w-100" style={{ borderRadius: '12px' }} />
+              <video
+                key={videoUrl}
+                src={videoUrl}
+                controls
+                preload="metadata"
+                className="w-100"
+                style={{ borderRadius: '12px' }}
+              />
             </div>
           </div>
         )}

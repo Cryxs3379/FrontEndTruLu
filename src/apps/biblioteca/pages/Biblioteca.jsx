@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getPeliculas, streamPelicula } from '../api/api';
+import { getPeliculas, buildStreamUrl } from '../api/api';
 import MovieCard from '../components/MovieCard';
 import NavbarBiblioteca from '../layout/NavbarBiblioteca';
 import { useAuth } from '../../../context/AuthContext';
@@ -50,14 +50,6 @@ const Biblioteca = () => {
     };
   }, [usuario]);
 
-  useEffect(() => {
-    return () => {
-      if (player.url) {
-        URL.revokeObjectURL(player.url);
-      }
-    };
-  }, [player.url]);
-
   const handlePlayMovie = async (movie) => {
     if (!usuario?.token) {
       setStreamError('Debes iniciar sesión nuevamente.');
@@ -67,9 +59,7 @@ const Biblioteca = () => {
     try {
       setStreamingMovieId(movie.id);
       setStreamError(null);
-      const blob = await streamPelicula(movie.id);
-      const url = URL.createObjectURL(blob);
-      if (player.url) URL.revokeObjectURL(player.url);
+      const url = buildStreamUrl(movie.id);
       setPlayer({ movie, url });
     } catch (err) {
       console.error('Error al reproducir película', err);
@@ -80,7 +70,6 @@ const Biblioteca = () => {
   };
 
   const closePlayer = () => {
-    if (player.url) URL.revokeObjectURL(player.url);
     setPlayer({ movie: null, url: null });
   };
 
@@ -129,6 +118,7 @@ const Biblioteca = () => {
                   key={player.url}
                   src={player.url}
                   controls
+                  preload="metadata"
                   className="w-100 mt-3"
                   style={{ maxHeight: '480px', borderRadius: '12px' }}
                 />

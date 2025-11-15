@@ -28,13 +28,8 @@ export const getPeliculas = async (config = {}) => {
   return res.data;
 };
 
-export const streamPelicula = async (peliculaId, { signal } = {}) => {
-  const res = await authClient.get(`/biblioteca/${peliculaId}/stream`, {
-    responseType: 'blob',
-    signal,
-  });
-  return res.data;
+export const buildStreamUrl = (peliculaId) => {
+  const token = JSON.parse(localStorage.getItem('usuario'))?.token || '';
+  return `${API_BASE}/biblioteca/${peliculaId}/stream?token=${encodeURIComponent(token)}`;
 };
-
-export const buildStreamUrl = (peliculaId) => `${API_BASE}/biblioteca/${peliculaId}/stream`;
  
