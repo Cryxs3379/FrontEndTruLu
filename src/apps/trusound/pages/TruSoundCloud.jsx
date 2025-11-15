@@ -1,4 +1,10 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+} from '@hello-pangea/dnd';
 import {
   loginTruSound,
   logoutTruSound,
@@ -27,6 +33,28 @@ const TABS = [
   { id: 'my-playlists', label: 'Mis playlists' },
   { id: 'public-playlists', label: 'Playlists públicas' },
 ];
+
+const generatePalette = (seed = 'TruSoundCloud') => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = hash % 360;
+  return [
+    `hsl(${(h + 360) % 360}, 85%, 65%)`,
+    `hsl(${(h + 30) % 360}, 70%, 52%)`,
+    `hsl(${(h + 60) % 360}, 75%, 55%)`,
+  ];
+};
+
+const formatTime = (seconds = 0) => {
+  if (!Number.isFinite(seconds)) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
+  return `${mins}:${secs}`;
+};
 
 const TruSoundCloud = () => {
   const [session, setSession] = useState(getTruSoundSession());
@@ -64,6 +92,11 @@ const TruSoundCloud = () => {
   });
   const [creatingPlaylist, setCreatingPlaylist] = useState(false);
   const [selectedTab, setSelectedTab] = useState('tracks');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [queuePanelOpen, setQueuePanelOpen] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -85,10 +118,66 @@ const TruSoundCloud = () => {
     }
   }, [myPlaylists, selectedPlaylistForAdd]);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleTimeUpdate = () => {
+      setProgress(audio.currentTime || 0);
+      setDuration(audio.duration || 0);
+    };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+    };
+  }, [audioUrl]);
+
   const favoriteIds = useMemo(
     () => new Set(favorites.map((track) => track.id)),
     [favorites],
   );
+
+  const activeArtistName = useMemo(() => {
+    if (currentTrack?.artist_name) return currentTrack.artist_name;
+    if (currentTrack?.artist_id) {
+      const artist = artists.find((item) => item.id === currentTrack.artist_id);
+      if (artist) return artist.name;
+    }
+    return selectedArtist?.name || session?.user?.email || 'TruSoundCloud';
+  }, [artists, currentTrack, selectedArtist, session]);
+
+  const [accent1, accent2, accent3] = useMemo(
+    () => generatePalette(activeArtistName || currentTrack?.title || 'TruSoundCloud'),
+    [activeArtistName, currentTrack],
+  );
+
+  const themeVars = useMemo(
+    () => ({
+      '--accent-1': accent1,
+      '--accent-2': accent2,
+      '--accent-3': accent3,
+    }),
+    [accent1, accent2, accent3],
+  );
+
+  const artworkInitial = (currentTrack?.title || activeArtistName || 'T')
+    .slice(0, 1)
+    .toUpperCase();
+  const artworkStyle = {
+    background: `linear-gradient(135deg, ${accent1}, ${accent2})`,
+  };
+  const safeDuration =
+    Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const displayProgress = safeDuration
+    ? Math.min(progress, safeDuration)
+    : 0;
 
   const loadArtists = async () => {
     try {
@@ -203,6 +292,57 @@ const TruSoundCloud = () => {
     const prevIndex = currentIndex - 1;
     if (prevIndex < 0) return;
     playTrackAtIndex(prevIndex);
+  };
+
+  const handleSeek = (value) => {
+    if (!audioRef.current) return;
+    const durationValue = audioRef.current.duration || 0;
+    const nextTime = Math.max(0, Math.min(Number(value), durationValue));
+    audioRef.current.currentTime = nextTime;
+    setProgress(nextTime);
+  };
+
+  const togglePlayback = () => {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) audioRef.current.play();
+    else audioRef.current.pause();
+  };
+
+  const handleQueueDragEnd = (result) => {
+    if (!result.destination) return;
+    const reordered = Array.from(playQueue);
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+
+    let newIndex = currentIndex;
+    if (result.source.index === currentIndex) {
+      newIndex = result.destination.index;
+    } else if (
+      currentIndex != null &&
+      result.source.index < currentIndex &&
+      result.destination.index >= currentIndex
+    ) {
+      newIndex -= 1;
+    } else if (
+      currentIndex != null &&
+      result.source.index > currentIndex &&
+      result.destination.index <= currentIndex
+    ) {
+      newIndex += 1;
+    }
+
+    setPlayQueue(reordered);
+    setCurrentIndex(newIndex);
+  };
+
+  const handleSwipeLeft = (track) => {
+    if (selectedPlaylistForAdd) {
+      handleAddTrackToPlaylist(track);
+    }
+  };
+
+  const handleSwipeRight = (track) => {
+    handleToggleFavorite(track);
   };
 
   const handleLogin = async ({ email, password }) => {
@@ -360,6 +500,8 @@ const TruSoundCloud = () => {
           onPlay={() => handlePlayFromList(playSourceList, index)}
           isFavorite={favoriteIds.has(track.id)}
           onToggleFavorite={handleToggleFavorite}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
           onAddToPlaylist={
             enableAdd && myPlaylists.length
               ? () => handleAddTrackToPlaylist(track)
@@ -374,18 +516,48 @@ const TruSoundCloud = () => {
   );
 
   return (
-    <div className="trusound-page">
+    <div className="trusound-page" style={themeVars}>
       <nav className="trusound-nav">
-        <div>
-          <h1>TruSoundCloud</h1>
-          <p>Tu colección musical auto-hosted</p>
+        <div className="brand">
+          <button
+            className="sidebar-toggle"
+            type="button"
+            onClick={() => setSidebarOpen((prev) => !prev)}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+              <path
+                d="M4 6h16M4 12h12M4 18h16"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <div>
+            <h1>TruSoundCloud</h1>
+            <p>Stream privado con estilo</p>
+          </div>
         </div>
         {session?.user ? (
           <button className="ghost" onClick={handleLogout} type="button">
-            Cerrar sesión · {session.user.email}
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+              <path
+                d="M15 3h4v18h-4M10 17l5-5-5-5M3 12h12"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {session.user.email}
           </button>
         ) : null}
       </nav>
+
+      <div
+        className={`sidebar-backdrop ${sidebarOpen ? 'show' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       {!session?.token && (
         <div className="login-overlay">
@@ -393,8 +565,8 @@ const TruSoundCloud = () => {
         </div>
       )}
 
-      <main className="trusound-layout">
-        <aside className="sidebar">
+      <main className={`trusound-layout ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <aside className={`sidebar ${sidebarOpen ? 'visible' : ''}`}>
           <h3>Artistas</h3>
           {loadingArtists && <p>Cargando artistas...</p>}
           {errorMessage && <p className="error">{errorMessage}</p>}
@@ -414,269 +586,433 @@ const TruSoundCloud = () => {
         </aside>
 
         <section className="content">
-          <div className="tab-bar">
-            {TABS.map((tab) => (
+          <div className="content-header">
+            <div className="tab-bar">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={selectedTab === tab.id ? 'active' : ''}
+                  onClick={() => {
+                    setSelectedTab(tab.id);
+                    if (tab.id === 'my-playlists') {
+                      setSelectedPlaylistScope('mine');
+                    } else if (tab.id === 'public-playlists') {
+                      setSelectedPlaylistScope('public');
+                    }
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="tab-actions">
               <button
-                key={tab.id}
                 type="button"
-                className={selectedTab === tab.id ? 'active' : ''}
-                onClick={() => {
-                  setSelectedTab(tab.id);
-                  if (tab.id === 'my-playlists') {
-                    setSelectedPlaylistScope('mine');
-                  } else if (tab.id === 'public-playlists') {
-                    setSelectedPlaylistScope('public');
-                  }
-                }}
+                className="pill queue-toggle"
+                onClick={() => setQueuePanelOpen(true)}
+                disabled={!playQueue.length}
               >
-                {tab.label}
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                  <path
+                    d="M4 6h16M4 12h10M4 18h6"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Mi cola ({playQueue.length})
               </button>
-            ))}
+            </div>
+            {actionMessage && <p className="success">{actionMessage}</p>}
+            {playlistError && <p className="error">{playlistError}</p>}
           </div>
 
-          {actionMessage && <p className="success">{actionMessage}</p>}
-          {playlistError && <p className="error">{playlistError}</p>}
+          <div className="tab-panels">
+            <AnimatePresence mode="wait">
+              {selectedTab === 'tracks' && (
+                <motion.section
+                  key="tracks"
+                  className="tab-panel tab-panel-tracks"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <header className="hero">
+                    <div>
+                      <p className="eyebrow">PLAYLIST DESTACADA</p>
+                      <h2>{selectedArtist?.name || 'Explora TruSoundCloud'}</h2>
+                      <p>{subtitle}</p>
+                    </div>
+                    {selectedArtist && (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => handleSelectArtist(selectedArtist)}
+                        disabled={loadingTracks}
+                      >
+                        {loadingTracks ? 'Actualizando...' : 'Actualizar lista'}
+                      </button>
+                    )}
+                  </header>
 
-          {selectedTab === 'tracks' && (
-            <>
-              <header className="hero">
-                <div>
-                  <p className="eyebrow">PLAYLIST DESTACADA</p>
-                  <h2>{selectedArtist?.name || 'Explora TruSoundCloud'}</h2>
-                  <p>{subtitle}</p>
-                </div>
-                {selectedArtist && (
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={() => handleSelectArtist(selectedArtist)}
-                    disabled={loadingTracks}
-                  >
-                    {loadingTracks ? 'Actualizando...' : 'Actualizar lista'}
-                  </button>
-                )}
-              </header>
+                  {myPlaylists.length > 0 && (
+                    <div className="add-playlist-widget">
+                      <label htmlFor="playlistSelect">
+                        Selecciona una playlist para añadir canciones:
+                      </label>
+                      <select
+                        id="playlistSelect"
+                        value={selectedPlaylistForAdd}
+                        onChange={(e) => setSelectedPlaylistForAdd(e.target.value)}
+                      >
+                        <option value="">-- Selecciona --</option>
+                        {myPlaylists.map((playlist) => (
+                          <option key={playlist.id} value={playlist.id}>
+                            {playlist.name}
+                            {playlist.is_public ? ' · Pública' : ' · Privada'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-              {myPlaylists.length > 0 && (
-                <div className="add-playlist-widget">
-                  <label htmlFor="playlistSelect">
-                    Selecciona una playlist para añadir canciones:
-                  </label>
-                  <select
-                    id="playlistSelect"
-                    value={selectedPlaylistForAdd}
-                    onChange={(e) => setSelectedPlaylistForAdd(e.target.value)}
-                  >
-                    <option value="">-- Selecciona --</option>
-                    {myPlaylists.map((playlist) => (
-                      <option key={playlist.id} value={playlist.id}>
-                        {playlist.name}
-                        {playlist.is_public ? ' · Pública' : ' · Privada'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {renderTrackList(tracks, {
+                    enableAdd: true,
+                    playSourceList: tracks,
+                  })}
+                </motion.section>
               )}
 
-              {renderTrackList(tracks, { enableAdd: true, playSourceList: tracks })}
-            </>
-          )}
-
-          {selectedTab === 'favorites' && (
-            <div className="favorites-panel">
-              <h3>Mis favoritos</h3>
-              {loadingFavorites && <p>Cargando favoritos...</p>}
-              {favoriteError && <p className="error">{favoriteError}</p>}
-              {!loadingFavorites && favorites.length === 0 && (
-                <p>Todavía no tienes canciones favoritas.</p>
+              {selectedTab === 'favorites' && (
+                <motion.section
+                  key="favorites"
+                  className="tab-panel tab-panel-favorites"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="favorites-panel">
+                    <h3>Mis favoritos</h3>
+                    {loadingFavorites && <p>Cargando favoritos...</p>}
+                    {favoriteError && <p className="error">{favoriteError}</p>}
+                    {!loadingFavorites && favorites.length === 0 && (
+                      <p>Todavía no tienes canciones favoritas.</p>
+                    )}
+                    {renderTrackList(favorites, {
+                      enableAdd: true,
+                      playSourceList: favorites,
+                    })}
+                  </div>
+                </motion.section>
               )}
-              {renderTrackList(favorites, {
-                enableAdd: true,
-                playSourceList: favorites,
-              })}
-            </div>
-          )}
 
-          {selectedTab === 'my-playlists' && (
-            <div className="playlist-layout">
-              <div className="playlist-column">
-                <h3>Mis playlists</h3>
-                {loadingMyPlaylists && <p>Cargando...</p>}
-                <div className="playlist-list">
-                  {myPlaylists.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className={`playlist-card ${
-                        selectedPlaylistDetail?.playlist?.id === playlist.id &&
-                        selectedPlaylistScope === 'mine'
-                          ? 'active'
-                          : ''
-                      }`}
-                      onClick={() => handleSelectPlaylistCard(playlist, 'mine')}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSelectPlaylistCard(playlist, 'mine');
-                      }}
-                    >
-                      <div>
-                        <h4>{playlist.name}</h4>
-                        <small>
-                          {playlist.is_public ? 'Pública' : 'Privada'} ·{' '}
-                          {new Date(playlist.created_at).toLocaleDateString()}
-                        </small>
+              {selectedTab === 'my-playlists' && (
+                <motion.section
+                  key="my-playlists"
+                  className="tab-panel tab-panel-my-playlists"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="playlist-layout">
+                    <div className="playlist-column">
+                      <h3>Mis playlists</h3>
+                      {loadingMyPlaylists && <p>Cargando...</p>}
+                      <div className="playlist-list">
+                        {myPlaylists.map((playlist) => (
+                          <div
+                            key={playlist.id}
+                            className={`playlist-card ${
+                              selectedPlaylistDetail?.playlist?.id === playlist.id &&
+                              selectedPlaylistScope === 'mine'
+                                ? 'active'
+                                : ''
+                            }`}
+                            onClick={() => handleSelectPlaylistCard(playlist, 'mine')}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter')
+                                handleSelectPlaylistCard(playlist, 'mine');
+                            }}
+                          >
+                            <div>
+                              <h4>{playlist.name}</h4>
+                              <small>
+                                {playlist.is_public ? 'Pública' : 'Privada'} ·{' '}
+                                {new Date(playlist.created_at).toLocaleDateString()}
+                              </small>
+                            </div>
+                            <div className="playlist-actions">
+                              <button
+                                type="button"
+                                className="icon-btn remove"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePlaylist(playlist.id);
+                                }}
+                              >
+                                <svg viewBox="0 0 24 24" width="18" height="18">
+                                  <path
+                                    d="M5 6h14M10 11v6M14 11v6M9 6V4h6v2"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {!loadingMyPlaylists && myPlaylists.length === 0 && (
+                          <p>Aún no has creado playlists.</p>
+                        )}
                       </div>
-                      <div className="playlist-actions">
-                        <button
-                          type="button"
-                          className="icon-btn remove"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePlaylist(playlist.id);
-                          }}
-                        >
-                          🗑️
+
+                      <form className="playlist-form" onSubmit={handleCreatePlaylist}>
+                        <h4>Crear playlist</h4>
+                        <input
+                          type="text"
+                          placeholder="Nombre"
+                          value={newPlaylist.name}
+                          onChange={(e) =>
+                            setNewPlaylist((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                          required
+                        />
+                        <textarea
+                          placeholder="Descripción (opcional)"
+                          value={newPlaylist.description}
+                          onChange={(e) =>
+                            setNewPlaylist((prev) => ({
+                              ...prev,
+                              description: e.target.value,
+                            }))
+                          }
+                        />
+                        <label className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={newPlaylist.is_public}
+                            onChange={(e) =>
+                              setNewPlaylist((prev) => ({
+                                ...prev,
+                                is_public: e.target.checked,
+                              }))
+                            }
+                          />
+                          Playlist pública
+                        </label>
+                        <button type="submit" disabled={creatingPlaylist}>
+                          {creatingPlaylist ? 'Creando...' : 'Crear playlist'}
                         </button>
+                      </form>
+                    </div>
+
+                    <div className="playlist-detail">
+                      {selectedPlaylistDetail && selectedPlaylistScope === 'mine' ? (
+                        <>
+                          <header>
+                            <div>
+                              <p className="eyebrow">Playlist seleccionada</p>
+                              <h3>{selectedPlaylistDetail.playlist.name}</h3>
+                              <small>
+                                {selectedPlaylistDetail.playlist.is_public
+                                  ? 'Pública'
+                                  : 'Privada'}{' '}
+                                · {selectedPlaylistDetail.playlist.owner_email}
+                              </small>
+                            </div>
+                          </header>
+                          {renderTrackList(playlistTracks, {
+                            enableRemove: canEditPlaylist,
+                            enableAdd: false,
+                            playSourceList: playlistTracks,
+                          })}
+                        </>
+                      ) : (
+                        <p>Selecciona una playlist para ver sus canciones.</p>
+                      )}
+                    </div>
+                  </div>
+                </motion.section>
+              )}
+
+              {selectedTab === 'public-playlists' && (
+                <motion.section
+                  key="public-playlists"
+                  className="tab-panel tab-panel-public-playlists"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="playlist-layout">
+                    <div className="playlist-column">
+                      <h3>Playlists públicas</h3>
+                      {loadingPublicPlaylists && <p>Cargando...</p>}
+                      <div className="playlist-list">
+                        {publicPlaylists.map((playlist) => (
+                          <div
+                            key={playlist.id}
+                            className={`playlist-card ${
+                              selectedPlaylistDetail?.playlist?.id === playlist.id &&
+                              selectedPlaylistScope === 'public'
+                                ? 'active'
+                                : ''
+                            }`}
+                            onClick={() => handleSelectPlaylistCard(playlist, 'public')}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter')
+                                handleSelectPlaylistCard(playlist, 'public');
+                            }}
+                          >
+                            <div>
+                              <h4>{playlist.name}</h4>
+                              <small>{playlist.owner_email}</small>
+                            </div>
+                          </div>
+                        ))}
+                        {!loadingPublicPlaylists && publicPlaylists.length === 0 && (
+                          <p>No hay playlists públicas disponibles.</p>
+                        )}
                       </div>
                     </div>
-                  ))}
-                  {!loadingMyPlaylists && myPlaylists.length === 0 && (
-                    <p>Aún no has creado playlists.</p>
-                  )}
-                </div>
 
-                <form className="playlist-form" onSubmit={handleCreatePlaylist}>
-                  <h4>Crear playlist</h4>
-                  <input
-                    type="text"
-                    placeholder="Nombre"
-                    value={newPlaylist.name}
-                    onChange={(e) =>
-                      setNewPlaylist((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    required
-                  />
-                  <textarea
-                    placeholder="Descripción (opcional)"
-                    value={newPlaylist.description}
-                    onChange={(e) =>
-                      setNewPlaylist((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                  />
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={newPlaylist.is_public}
-                      onChange={(e) =>
-                        setNewPlaylist((prev) => ({
-                          ...prev,
-                          is_public: e.target.checked,
-                        }))
-                      }
-                    />
-                    Playlist pública
-                  </label>
-                  <button type="submit" disabled={creatingPlaylist}>
-                    {creatingPlaylist ? 'Creando...' : 'Crear playlist'}
-                  </button>
-                </form>
-              </div>
-
-              <div className="playlist-detail">
-                {selectedPlaylistDetail && selectedPlaylistScope === 'mine' ? (
-                  <>
-                    <header>
-                      <div>
-                        <p className="eyebrow">Playlist seleccionada</p>
-                        <h3>{selectedPlaylistDetail.playlist.name}</h3>
-                        <small>
-                          {selectedPlaylistDetail.playlist.is_public
-                            ? 'Pública'
-                            : 'Privada'}{' '}
-                          · {selectedPlaylistDetail.playlist.owner_email}
-                        </small>
-                      </div>
-                    </header>
-                    {renderTrackList(playlistTracks, {
-                      enableRemove: canEditPlaylist,
-                      enableAdd: false,
-                      playSourceList: playlistTracks,
-                    })}
-                  </>
-                ) : (
-                  <p>Selecciona una playlist para ver sus canciones.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedTab === 'public-playlists' && (
-            <div className="playlist-layout">
-              <div className="playlist-column">
-                <h3>Playlists públicas</h3>
-                {loadingPublicPlaylists && <p>Cargando...</p>}
-                <div className="playlist-list">
-                  {publicPlaylists.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className={`playlist-card ${
-                        selectedPlaylistDetail?.playlist?.id === playlist.id &&
-                        selectedPlaylistScope === 'public'
-                          ? 'active'
-                          : ''
-                      }`}
-                      onClick={() => handleSelectPlaylistCard(playlist, 'public')}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSelectPlaylistCard(playlist, 'public');
-                      }}
-                    >
-                      <div>
-                        <h4>{playlist.name}</h4>
-                        <small>{playlist.owner_email}</small>
-                      </div>
+                    <div className="playlist-detail">
+                      {selectedPlaylistDetail && selectedPlaylistScope === 'public' ? (
+                        <>
+                          <header>
+                            <div>
+                              <p className="eyebrow">Playlist pública</p>
+                              <h3>{selectedPlaylistDetail.playlist.name}</h3>
+                              <small>
+                                Por {selectedPlaylistDetail.playlist.owner_email}
+                              </small>
+                            </div>
+                          </header>
+                          {renderTrackList(playlistTracks, {
+                            playSourceList: playlistTracks,
+                          })}
+                        </>
+                      ) : (
+                        <p>Selecciona una playlist pública para ver su contenido.</p>
+                      )}
                     </div>
-                  ))}
-                  {!loadingPublicPlaylists && publicPlaylists.length === 0 && (
-                    <p>No hay playlists públicas disponibles.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="playlist-detail">
-                {selectedPlaylistDetail && selectedPlaylistScope === 'public' ? (
-                  <>
-                    <header>
-                      <div>
-                        <p className="eyebrow">Playlist pública</p>
-                        <h3>{selectedPlaylistDetail.playlist.name}</h3>
-                        <small>
-                          Por {selectedPlaylistDetail.playlist.owner_email}
-                        </small>
-                      </div>
-                    </header>
-                    {renderTrackList(playlistTracks, {
-                      playSourceList: playlistTracks,
-                    })}
-                  </>
-                ) : (
-                  <p>Selecciona una playlist pública para ver su contenido.</p>
-                )}
-              </div>
-            </div>
-          )}
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+          </div>
         </section>
       </main>
 
+      <AnimatePresence>
+        {queuePanelOpen && (
+          <motion.aside
+            className="queue-panel"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.25 }}
+          >
+            <header>
+              <div>
+                <p className="eyebrow">Tu cola</p>
+                <h3>{playQueue.length ? 'Reordenar y gestionar' : 'Sin canciones'}</h3>
+              </div>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setQueuePanelOpen(false)}
+              >
+                Cerrar
+              </button>
+            </header>
+            {playQueue.length === 0 ? (
+              <p>Reproduce una canción para comenzar a llenar la cola.</p>
+            ) : (
+              <DragDropContext onDragEnd={handleQueueDragEnd}>
+                <Droppable droppableId="queue">
+                  {(droppableProvided) => (
+                    <div
+                      className="queue-list"
+                      ref={droppableProvided.innerRef}
+                      {...droppableProvided.droppableProps}
+                    >
+                      {playQueue.map((track, index) => (
+                        <Draggable
+                          key={`queue-${track.id}-${index}`}
+                          draggableId={`queue-${track.id}-${index}`}
+                          index={index}
+                        >
+                          {(draggableProvided) => (
+                            <motion.div
+                              className={`queue-item ${
+                                index === currentIndex ? 'active' : ''
+                              }`}
+                              ref={draggableProvided.innerRef}
+                              {...draggableProvided.draggableProps}
+                              {...draggableProvided.dragHandleProps}
+                              onClick={() => playTrackAtIndex(index)}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              <span className="queue-pos">{index + 1}</span>
+                              <div className="queue-info">
+                                <strong>{track.title}</strong>
+                                <small>{formatDuration(track.duration_seconds)}</small>
+                              </div>
+                              <button
+                                type="button"
+                                className="icon-btn add"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playTrackAtIndex(index);
+                                }}
+                              >
+                                <svg viewBox="0 0 24 24" width="16" height="16">
+                                  <path
+                                    d="M7 4l12 8-12 8z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              </button>
+                            </motion.div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {droppableProvided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
       {currentTrack && (
         <footer className="player-bar">
-          <div className="track-meta">
-            <strong>{currentTrack.title}</strong>
-            <span>{selectedArtist?.name}</span>
+          <div className="mini-left">
+            <div className="artwork-chip" style={artworkStyle}>
+              {artworkInitial}
+            </div>
+            <div className="track-meta">
+              <strong>{currentTrack.title}</strong>
+              <span>{activeArtistName}</span>
+              <div className="eq-indicator" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
           </div>
           <div className="player-controls">
             <button
@@ -685,16 +1021,29 @@ const TruSoundCloud = () => {
               className="control-btn"
               disabled={currentIndex === 0}
             >
-              ⏮
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path
+                  d="M10 7v10l-6-5 6-5zm10 10V7l-6 5 6 5z"
+                  fill="currentColor"
+                />
+              </svg>
             </button>
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              controls
-              autoPlay
-              preload="metadata"
-              onEnded={handleNextTrack}
-            />
+            <button
+              type="button"
+              onClick={togglePlayback}
+              className="control-btn primary-btn"
+              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+            >
+              {isPlaying ? (
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path d="M9 6h2v12H9zm4 0h2v12h-2z" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path d="M8 5v14l11-7z" fill="currentColor" />
+                </svg>
+              )}
+            </button>
             <button
               type="button"
               onClick={handleNextTrack}
@@ -705,223 +1054,444 @@ const TruSoundCloud = () => {
                 !playQueue.length
               }
             >
-              ⏭
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path
+                  d="M14 7v10l6-5-6-5zm-10 10V7l6 5-6 5z"
+                  fill="currentColor"
+                />
+              </svg>
             </button>
+            <div className="progress-group">
+              <span>{formatTime(displayProgress)}</span>
+              <input
+                type="range"
+                min="0"
+                max={safeDuration}
+                step="0.1"
+                value={safeDuration ? displayProgress : 0}
+                onChange={(e) => handleSeek(e.target.value)}
+                disabled={!safeDuration}
+              />
+              <span>{formatTime(safeDuration)}</span>
+            </div>
           </div>
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            autoPlay
+            preload="metadata"
+            onEnded={handleNextTrack}
+            style={{ display: 'none' }}
+          />
         </footer>
       )}
 
       <style>{`
+        :root {
+          font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
         .trusound-page {
           min-height: 100vh;
-          background: radial-gradient(circle at top, #1f2937, #0f172a 70%);
+          background: radial-gradient(circle at top, var(--accent-1, #4f46e5), #020617 70%);
           color: #fff;
-          font-family: 'Poppins', sans-serif;
           position: relative;
-          overflow: hidden;
+          overflow-x: hidden;
+          padding-bottom: 5rem;
         }
 
         .trusound-nav {
+          position: sticky;
+          top: 0;
+          z-index: 40;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1.5rem 3rem;
+          gap: 1rem;
+          padding: 1rem clamp(1.2rem, 5vw, 3rem);
+          background: linear-gradient(180deg, rgba(4,7,15,0.95), rgba(4,7,15,0.6));
+          backdrop-filter: blur(18px);
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 0.9rem;
+        }
+
+        .sidebar-toggle {
+          border: 1px solid rgba(255,255,255,0.3);
+          background: transparent;
+          color: #fff;
+          border-radius: 11px;
+          width: 40px;
+          height: 40px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
         }
 
         .trusound-nav h1 {
           margin: 0;
-          font-size: 1.8rem;
+          font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+          letter-spacing: 0.04em;
+        }
+
+        .trusound-nav p {
+          margin: 0;
+          color: rgba(226,232,240,0.8);
+          font-size: 0.85rem;
+        }
+
+        .sidebar-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(2,6,23,0.6);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease-out;
+          z-index: 35;
+        }
+        .sidebar-backdrop.show {
+          opacity: 1;
+          pointer-events: all;
         }
 
         .trusound-layout {
           display: flex;
-          padding: 0 3rem 3rem;
           gap: 1.5rem;
+          padding: 1.5rem clamp(1.2rem, 4vw, 3rem) 3rem;
+          max-width: 1400px;
+          margin: 0 auto;
         }
 
         .sidebar {
-          width: 320px;
-          background: rgba(15, 23, 42, 0.7);
-          backdrop-filter: blur(10px);
-          border-radius: 18px;
-          padding: 1.5rem;
+          flex-shrink: 0;
+          width: clamp(260px, 28%, 330px);
+          background: radial-gradient(circle at top, rgba(15,23,42,0.9), rgba(2,6,23,0.95));
+          border-radius: 20px;
+          padding: 1.3rem;
+          border: 1px solid rgba(255,255,255,0.08);
+          box-shadow: 0 20px 40px rgba(2,6,23,0.9);
           max-height: calc(100vh - 200px);
           overflow-y: auto;
+          transform: translateX(0);
+          transition: transform 0.25s ease-in-out;
+        }
+
+        .sidebar h3 {
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+          font-size: 0.8rem;
+          color: rgba(241,245,249,0.7);
+        }
+
+        .sidebar.visible {
+          transform: translateX(0);
         }
 
         .artist-list {
           display: flex;
           flex-direction: column;
-          gap: 0.8rem;
+          gap: 0.85rem;
           margin-top: 1rem;
         }
 
         .artist-card {
-          border: none;
+          border: 1px solid rgba(255,255,255,0.06);
           text-align: left;
-          padding: 1rem;
-          border-radius: 14px;
-          background: rgba(255, 255, 255, 0.05);
-          color: #fff;
+          padding: 0.85rem;
+          border-radius: 16px;
+          background: rgba(9,9,20,0.8);
+          color: #e5e7eb;
           cursor: pointer;
           display: flex;
-          gap: 1rem;
+          gap: 0.65rem;
           align-items: center;
-          transition: transform 0.2s, background 0.2s;
+          transition: transform 0.15s ease-out, border 0.15s ease-out, box-shadow 0.15s ease-out;
         }
 
         .artist-card.active,
         .artist-card:hover {
-          background: rgba(99, 102, 241, 0.25);
-          transform: translateX(4px);
+          border-color: rgba(255,255,255,0.35);
+          box-shadow: 0 15px 35px rgba(4,7,15,0.8);
+          transform: translateY(-1px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
         }
 
         .artist-card .artwork {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
-          background: linear-gradient(145deg, #6366f1, #8b5cf6);
+          width: 46px;
+          height: 46px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: bold;
-        }
-
-        .artist-card .info h4 {
-          margin: 0;
-          font-size: 1rem;
-        }
-
-        .artist-card .info p {
-          margin: 0;
-          font-size: 0.85rem;
-          color: #cbd5f5;
+          font-weight: 600;
+          font-size: 0.95rem;
+          color: #020617;
         }
 
         .content {
           flex: 1;
-          background: rgba(15, 23, 42, 0.55);
-          border-radius: 24px;
-          padding: 2rem;
+          background: rgba(2,6,23,0.8);
+          border-radius: 26px;
+          padding: 1.4rem clamp(1rem, 2vw, 2rem);
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 30px 60px rgba(2,6,23,0.85);
+          min-width: 0;
+        }
+
+        .content-header {
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
+          gap: 0.7rem;
         }
 
         .tab-bar {
           display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .tab-bar button {
+          background: rgba(15,23,42,0.7);
+          border: 1px solid rgba(255,255,255,0.1);
+          color: #eaeefe;
+          border-radius: 999px;
+          padding: 0.35rem 1rem;
+          cursor: pointer;
+          font-size: 0.85rem;
+          letter-spacing: 0.02em;
+          transition: all 0.18s ease;
+        }
+        .tab-bar button.active {
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+          color: #020617;
+          border-color: transparent;
+        }
+
+        .tab-actions {
+          display: flex;
+          align-items: center;
           gap: 0.5rem;
           flex-wrap: wrap;
         }
 
-        .tab-bar button {
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          color: #fff;
+        .pill {
           border-radius: 999px;
-          padding: 0.4rem 1rem;
+          padding: 0.35rem 0.9rem;
+          border: 1px solid rgba(255,255,255,0.2);
+          background: rgba(15,23,42,0.85);
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
           cursor: pointer;
-          font-weight: 500;
         }
 
-        .tab-bar button.active {
-          background: #22d3ee;
-          color: #0f172a;
+        .pill:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
+
+        .tab-panels {
+          margin-top: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1.2rem;
         }
 
         .hero {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: linear-gradient(120deg, rgba(99,102,241,0.6), rgba(14,165,233,0.6));
-          border-radius: 20px;
-          padding: 2rem;
+          gap: 1rem;
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+          border-radius: 22px;
+          padding: clamp(1rem, 2vw, 1.6rem);
+          color: #020617;
         }
 
         .hero .eyebrow {
-          letter-spacing: 2px;
-          font-size: 0.75rem;
-          color: rgba(255,255,255,0.8);
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+          font-size: 0.7rem;
+          margin-bottom: 0.2rem;
         }
-
         .hero h2 {
-          margin: 0.3rem 0;
-          font-size: 2rem;
+          margin: 0.1rem 0;
+          font-size: clamp(1.4rem, 2.4vw, 1.8rem);
         }
-
         .hero p {
           margin: 0;
-          color: rgba(255,255,255,0.85);
+          color: rgba(2,6,23,0.7);
         }
 
         .tracks-panel {
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.6rem;
         }
 
         .track-row {
           display: grid;
-          grid-template-columns: auto 1fr auto auto;
+          grid-template-columns: auto minmax(0, 1.2fr) auto auto;
           align-items: center;
-          gap: 1rem;
-          padding: 0.9rem 1.2rem;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.03);
+          gap: 0.8rem;
+          padding: 0.8rem 1rem;
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.05);
+          background: rgba(7,11,26,0.8);
+          transition: transform 0.15s ease, border 0.15s ease;
         }
-
         .track-row.active {
-          background: rgba(99, 102, 241, 0.25);
+          border-color: rgba(255,255,255,0.4);
+          background: rgba(255,255,255,0.07);
         }
 
         .play-btn {
-          background: none;
-          border: none;
+          border: 1px solid rgba(255,255,255,0.3);
+          background: transparent;
           color: #fff;
-          font-size: 1.2rem;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           cursor: pointer;
         }
 
         .track-info h5 {
           margin: 0;
+          font-size: 0.95rem;
+        }
+        .track-info small {
+          color: rgba(226,232,240,0.75);
+        }
+        .track-info .eq-bars {
+          display: inline-flex;
+          gap: 2px;
+          margin-left: 0.4rem;
+        }
+        .track-info .eq-bars span {
+          width: 3px;
+          height: 12px;
+          background: var(--accent-1);
+          display: inline-block;
+          animation: eqBounce 1s ease-in-out infinite;
+        }
+        .track-info .eq-bars span:nth-child(2) {
+          animation-delay: 0.15s;
+        }
+        .track-info .eq-bars span:nth-child(3) {
+          animation-delay: 0.3s;
         }
 
-        .track-info small {
-          color: rgba(255,255,255,0.6);
+        @keyframes eqBounce {
+          0%,100% { transform: scaleY(0.3); }
+          50% { transform: scaleY(1); }
         }
 
         .track-meta {
           display: flex;
-          gap: 0.8rem;
-          color: rgba(255,255,255,0.75);
+          gap: 0.6rem;
+          color: rgba(226,232,240,0.8);
+          font-size: 0.75rem;
+          justify-content: flex-end;
         }
 
         .track-actions {
           display: flex;
-          gap: 0.4rem;
+          gap: 0.35rem;
         }
 
         .icon-btn {
-          background: transparent;
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
-          padding: 0.2rem 0.5rem;
-          color: #fff;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.2);
+          background: rgba(10,12,22,0.8);
+          color: #e5e7eb;
+          padding: 0.25rem 0.55rem;
           cursor: pointer;
-          font-size: 0.9rem;
-          transition: background 0.2s, border 0.2s;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.1s ease, border 0.15s ease;
         }
-
+        .icon-btn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(255,255,255,0.4);
+        }
         .icon-btn.heart.active {
-          border-color: #f87171;
+          border-color: #fb7185;
+          color: #fb7185;
         }
 
-        .icon-btn.add {
-          border-color: #34d399;
+        .favorites-panel,
+        .playlist-layout {
+          background: rgba(7,9,20,0.85);
+          border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.05);
+          padding: 1.2rem;
         }
 
-        .icon-btn.remove {
-          border-color: #f87171;
+        .playlist-layout {
+          display: flex;
+          gap: 1.1rem;
+        }
+        .playlist-column {
+          width: clamp(250px, 30%, 320px);
+          display: flex;
+          flex-direction: column;
+          gap: 0.8rem;
+        }
+        .playlist-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .playlist-card {
+          border-radius: 14px;
+          padding: 0.8rem;
+          border: 1px solid rgba(255,255,255,0.07);
+          background: rgba(8,10,22,0.9);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+        }
+        .playlist-card.active {
+          border-color: rgba(255,255,255,0.35);
+        }
+
+        .playlist-form {
+          background: rgba(5,7,16,0.9);
+          border-radius: 14px;
+          padding: 0.9rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+          border: 1px solid rgba(255,255,255,0.05);
+        }
+        .playlist-form input,
+        .playlist-form textarea,
+        .add-playlist-widget select {
+          background: rgba(2,6,23,0.9);
+          border: 1px solid rgba(255,255,255,0.15);
+          color: #e5e7eb;
+          border-radius: 10px;
+          padding: 0.6rem 0.8rem;
+        }
+
+        .add-playlist-widget {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          margin-top: 0.9rem;
         }
 
         .player-bar {
@@ -929,226 +1499,189 @@ const TruSoundCloud = () => {
           left: 50%;
           transform: translateX(-50%);
           bottom: 1rem;
-          width: min(900px, calc(100% - 2rem));
-          background: rgba(15,23,42,0.9);
-          backdrop-filter: blur(10px);
-          padding: 0.8rem 1.5rem;
+          width: min(960px, calc(100% - 1.2rem));
+          background: rgba(1,3,10,0.95);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 20px;
+          padding: 0.9rem 1.3rem;
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          align-items: center;
+          box-shadow: 0 25px 50px rgba(2,6,23,0.9);
+          z-index: 45;
+        }
+
+        .mini-left {
+          display: flex;
+          gap: 0.9rem;
+          align-items: center;
+          min-width: 0;
+        }
+
+        .artwork-chip {
+          width: 52px;
+          height: 52px;
           border-radius: 16px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 1rem;
-        }
-
-        .player-bar audio {
-          flex: 1;
+          justify-content: center;
+          color: #020617;
+          font-weight: 700;
         }
 
         .player-controls {
+          flex: 1;
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          width: 100%;
         }
-
-        .control-btn {
-          background: rgba(255,255,255,0.1);
-          border: none;
-          color: #fff;
-          border-radius: 50%;
-          width: 36px;
-          height: 36px;
-          cursor: pointer;
+        .player-controls .progress-group {
           display: flex;
           align-items: center;
-          justify-content: center;
-          font-size: 1rem;
+          gap: 0.4rem;
+          flex: 1;
+        }
+        .player-controls .progress-group span {
+          font-size: 0.75rem;
+          color: rgba(226,232,240,0.7);
+        }
+        .player-controls input[type="range"] {
+          flex: 1;
+          accent-color: var(--accent-1);
+        }
+        .primary-btn {
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+          color: #020617;
+          border: none;
+        }
+
+        .eq-indicator {
+          display: inline-flex;
+          gap: 3px;
+          margin-top: 0.2rem;
+        }
+        .eq-indicator span {
+          width: 3px;
+          height: 14px;
+          background: var(--accent-1);
+          animation: eqBounce 1s ease-in-out infinite;
+        }
+        .eq-indicator span:nth-child(2) { animation-delay: 0.15s; }
+        .eq-indicator span:nth-child(3) { animation-delay: 0.3s; }
+
+        .queue-panel {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(2,6,23,0.98);
+          border-radius: 24px 24px 0 0;
+          padding: 1.3rem 1.4rem 2.5rem;
+          border: 1px solid rgba(255,255,255,0.08);
+          z-index: 50;
+          max-height: 80vh;
+          overflow-y: auto;
+        }
+        .queue-panel header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+        .queue-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+        .queue-item {
+          display: flex;
+          align-items: center;
+          gap: 0.8rem;
+          padding: 0.7rem 0.9rem;
+          border-radius: 14px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(3,7,18,0.9);
+          cursor: grab;
+        }
+        .queue-item.active {
+          border-color: rgba(255,255,255,0.4);
+          background: rgba(255,255,255,0.06);
+        }
+        .queue-pos {
+          font-weight: 600;
+          color: rgba(255,255,255,0.6);
+        }
+        .queue-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .queue-info strong {
+          display: block;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .queue-info small {
+          color: rgba(226,232,240,0.7);
         }
 
         .ghost {
           background: transparent;
-          border: 1px solid rgba(255,255,255,0.4);
-          border-radius: 20px;
-          padding: 0.4rem 1rem;
+          border: 1px solid rgba(255,255,255,0.25);
           color: #fff;
+          border-radius: 999px;
+          padding: 0.35rem 0.9rem;
           cursor: pointer;
         }
 
         .primary {
-          background: #22d3ee;
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
           border: none;
-          color: #0f172a;
+          color: #020617;
           border-radius: 999px;
-          padding: 0.6rem 1.8rem;
-          font-weight: 600;
+          padding: 0.55rem 1.3rem;
           cursor: pointer;
         }
 
-        .login-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.8);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 10;
-        }
-
-        .login-panel {
-          background: rgba(15, 23, 42, 0.95);
-          border-radius: 20px;
-          padding: 2rem;
-          width: 320px;
-          display: flex;
-          flex-direction: column;
-          gap: 0.9rem;
-        }
-
-        .login-panel input {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.2);
-          border-radius: 10px;
-          padding: 0.7rem 1rem;
-          color: #fff;
-        }
-
-        .login-panel button {
-          background: linear-gradient(135deg, #34d399, #10b981);
-          border: none;
-          border-radius: 999px;
-          padding: 0.7rem;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .login-panel .error,
-        .error {
-          color: #f87171;
-        }
-
-        .success {
-          color: #34d399;
-          font-weight: 500;
-        }
-
-        .favorites-panel,
-        .playlist-layout {
-          background: rgba(15,23,42,0.45);
-          border-radius: 20px;
-          padding: 1.5rem;
-        }
-
-        .playlist-layout {
-          display: flex;
-          gap: 1.5rem;
-        }
-
-        .playlist-column {
-          width: 320px;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .playlist-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
-        }
-
-        .playlist-card {
-          border-radius: 14px;
-          padding: 0.9rem 1rem;
-          background: rgba(255,255,255,0.05);
-          cursor: pointer;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .playlist-card.active {
-          background: rgba(99,102,241,0.3);
-        }
-
-        .playlist-detail {
-          flex: 1;
-          background: rgba(15,23,42,0.35);
-          border-radius: 18px;
-          padding: 1.5rem;
-          min-height: 300px;
-        }
-
-        .playlist-form {
-          background: rgba(255,255,255,0.03);
-          border-radius: 14px;
-          padding: 1rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.7rem;
-        }
-
-        .playlist-form input,
-        .playlist-form textarea,
-        .add-playlist-widget select {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.2);
-          border-radius: 10px;
-          padding: 0.6rem 0.8rem;
-          color: #fff;
-        }
-
-        .playlist-form textarea {
-          min-height: 80px;
-          resize: vertical;
-        }
-
-        .playlist-form button,
-        .add-playlist-widget select {
-          font-family: inherit;
-        }
-
-        .checkbox {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          font-size: 0.9rem;
-        }
-
-        .add-playlist-widget {
-          display: flex;
-          flex-direction: column;
-          gap: 0.4rem;
-        }
-
-        .playlist-detail header {
-          margin-bottom: 1rem;
-        }
-
-        @media (max-width: 960px) {
+        @media (max-width: 1100px) {
           .trusound-layout {
             flex-direction: column;
           }
           .sidebar {
-            width: 100%;
-            max-height: none;
+            position: fixed;
+            top: 4.5rem;
+            left: 0;
+            bottom: 0;
+            width: min(320px, 80vw);
+            transform: translateX(-100%);
+            z-index: 45;
           }
+          .sidebar.visible {
+            transform: translateX(0);
+          }
+        }
+
+        @media (max-width: 768px) {
           .player-bar {
             flex-direction: column;
-            align-items: flex-start;
+            align-items: stretch;
           }
-          .track-row {
-            grid-template-columns: 1fr;
-          }
-          .track-meta {
-            justify-content: space-between;
-          }
-
-          .playlist-layout {
+          .player-controls {
             flex-direction: column;
           }
-
-          .playlist-column {
+          .mini-left {
             width: 100%;
+          }
+          .artwork-chip {
+            width: 44px;
+            height: 44px;
+          }
+          .track-row {
+            grid-template-columns: auto minmax(0, 1fr);
+          }
+          .track-meta {
+            justify-content: flex-start;
           }
         }
       `}</style>
