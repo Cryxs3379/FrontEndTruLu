@@ -66,3 +66,60 @@ export const buildTrackStreamUrl = (trackId) => {
 
 export const TruSoundSessionKey = SESSION_KEY;
 
+export const fetchFavorites = async () => {
+  const { data } = await client.get('/TruSoundCloud/favorites');
+  return data;
+};
+
+export const addFavorite = async (trackId) => {
+  const { data } = await client.post('/TruSoundCloud/favorites', { trackId });
+  return data;
+};
+
+export const removeFavorite = async (trackId) => {
+  const { data } = await client.delete(`/TruSoundCloud/favorites/${trackId}`);
+  return data;
+};
+
+export const fetchMyPlaylists = async () => {
+  const { data } = await client.get('/TruSoundCloud/playlists/mine');
+  return data;
+};
+
+export const fetchPublicPlaylists = async () => {
+  const { data } = await client.get('/TruSoundCloud/playlists/public');
+  return data;
+};
+
+export const createPlaylist = async (payload) => {
+  const { data } = await client.post('/TruSoundCloud/playlists', payload);
+  return data;
+};
+
+export const fetchPlaylistDetail = async (playlistId) => {
+  const { data } = await client.get(`/TruSoundCloud/playlists/${playlistId}`);
+  return data;
+};
+
+export const addTrackToPlaylist = async (playlistId, trackId, position) => {
+  const payload = { trackId };
+  if (position !== undefined) payload.position = position;
+  const { data } = await client.post(
+    `/TruSoundCloud/playlists/${playlistId}/tracks`,
+    payload,
+  );
+  return data;
+};
+
+export const removeTrackFromPlaylist = async (playlistId, trackId) => {
+  const { data } = await client.delete(
+    `/TruSoundCloud/playlists/${playlistId}/tracks/${trackId}`,
+  );
+  return data;
+};
+
+export const deletePlaylist = async (playlistId) => {
+  const { data } = await client.delete(`/TruSoundCloud/playlists/${playlistId}`);
+  return data;
+};
+

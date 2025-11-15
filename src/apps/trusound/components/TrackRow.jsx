@@ -7,7 +7,15 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const TrackRow = ({ track, isActive, onPlay }) => (
+const TrackRow = ({
+  track,
+  isActive,
+  onPlay,
+  isFavorite = false,
+  onToggleFavorite,
+  onAddToPlaylist,
+  onRemoveFromPlaylist,
+}) => (
   <div className={`track-row ${isActive ? 'active' : ''}`}>
     <button type="button" onClick={() => onPlay?.(track)} className="play-btn">
       {isActive ? '⏸️' : '▶️'}
@@ -19,6 +27,38 @@ const TrackRow = ({ track, isActive, onPlay }) => (
     <div className="track-meta">
       <span>{(track.size / (1024 * 1024)).toFixed(1)} MB</span>
       <span>{formatDuration(track.duration_seconds)}</span>
+    </div>
+    <div className="track-actions">
+      {onToggleFavorite && (
+        <button
+          type="button"
+          className={`icon-btn heart ${isFavorite ? 'active' : ''}`}
+          onClick={() => onToggleFavorite(track)}
+          aria-label="Toggle favorite"
+        >
+          {isFavorite ? '❤️' : '🤍'}
+        </button>
+      )}
+      {onAddToPlaylist && (
+        <button
+          type="button"
+          className="icon-btn add"
+          onClick={() => onAddToPlaylist(track)}
+          aria-label="Add to playlist"
+        >
+          ➕
+        </button>
+      )}
+      {onRemoveFromPlaylist && (
+        <button
+          type="button"
+          className="icon-btn remove"
+          onClick={() => onRemoveFromPlaylist(track)}
+          aria-label="Remove from playlist"
+        >
+          🗑️
+        </button>
+      )}
     </div>
   </div>
 );

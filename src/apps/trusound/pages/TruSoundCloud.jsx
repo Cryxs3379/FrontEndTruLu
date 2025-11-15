@@ -6,10 +6,27 @@ import {
   fetchArtists,
   fetchArtistTracks,
   buildTrackStreamUrl,
+  fetchFavorites,
+  addFavorite,
+  removeFavorite,
+  fetchMyPlaylists,
+  fetchPublicPlaylists,
+  createPlaylist,
+  fetchPlaylistDetail,
+  addTrackToPlaylist,
+  removeTrackFromPlaylist,
+  deletePlaylist,
 } from '../api/api';
 import ArtistCard from '../components/ArtistCard';
 import TrackRow from '../components/TrackRow';
 import LoginPanel from '../components/LoginPanel';
+
+const TABS = [
+  { id: 'tracks', label: 'Canciones' },
+  { id: 'favorites', label: 'Favoritos' },
+  { id: 'my-playlists', label: 'Mis playlists' },
+  { id: 'public-playlists', label: 'Playlists públicas' },
+];
 
 const TruSoundCloud = () => {
   const [session, setSession] = useState(getTruSoundSession());
@@ -23,31 +40,125 @@ const TruSoundCloud = () => {
   const [errorMessage, setErrorMessage] = useState(null);
   const [loginError, setLoginError] = useState(null);
 
+  const [favorites, setFavorites] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+  const [favoriteError, setFavoriteError] = useState(null);
+
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [publicPlaylists, setPublicPlaylists] = useState([]);
+  const [loadingMyPlaylists, setLoadingMyPlaylists] = useState(false);
+  const [loadingPublicPlaylists, setLoadingPublicPlaylists] = useState(false);
+  const [playlistError, setPlaylistError] = useState(null);
+  const [actionMessage, setActionMessage] = useState(null);
+
+  const [selectedPlaylistDetail, setSelectedPlaylistDetail] = useState(null);
+  const [selectedPlaylistScope, setSelectedPlaylistScope] = useState('mine');
+  const [selectedPlaylistForAdd, setSelectedPlaylistForAdd] = useState('');
+  const [newPlaylist, setNewPlaylist] = useState({
+    name: '',
+    description: '',
+    is_public: true,
+  });
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('tracks');
+
   useEffect(() => {
     if (!session?.token) return;
-
-    const loadArtists = async () => {
-      try {
-        setLoadingArtists(true);
-        setErrorMessage(null);
-        const data = await fetchArtists();
-        setArtists(data);
-        if (data.length) {
-          handleSelectArtist(data[0]);
-        } else {
-          setSelectedArtist(null);
-          setTracks([]);
-        }
-      } catch (err) {
-        console.error('Error cargando artistas', err);
-        setErrorMessage('No se pudieron cargar los artistas.');
-      } finally {
-        setLoadingArtists(false);
-      }
-    };
-
     loadArtists();
+    loadFavorites();
+    loadMyPlaylists();
+    loadPublicPlaylists();
   }, [session?.token]);
+
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timeout = setTimeout(() => setActionMessage(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [actionMessage]);
+
+  useEffect(() => {
+    if (!selectedPlaylistForAdd && myPlaylists.length) {
+      setSelectedPlaylistForAdd(String(myPlaylists[0].id));
+    }
+  }, [myPlaylists, selectedPlaylistForAdd]);
+
+  const favoriteIds = useMemo(
+    () => new Set(favorites.map((track) => track.id)),
+    [favorites],
+  );
+
+  const loadArtists = async () => {
+    try {
+      setLoadingArtists(true);
+      setErrorMessage(null);
+      const data = await fetchArtists();
+      setArtists(data);
+      if (data.length) {
+        handleSelectArtist(data[0]);
+      } else {
+        setSelectedArtist(null);
+        setTracks([]);
+      }
+    } catch (err) {
+      console.error('Error cargando artistas', err);
+      setErrorMessage('No se pudieron cargar los artistas.');
+    } finally {
+      setLoadingArtists(false);
+    }
+  };
+
+  const loadFavorites = async () => {
+    try {
+      setLoadingFavorites(true);
+      setFavoriteError(null);
+      const data = await fetchFavorites();
+      setFavorites(data);
+    } catch (err) {
+      console.error('Error cargando favoritos', err);
+      setFavoriteError('No se pudieron cargar tus favoritos.');
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  const loadMyPlaylists = async () => {
+    try {
+      setLoadingMyPlaylists(true);
+      setPlaylistError(null);
+      const data = await fetchMyPlaylists();
+      setMyPlaylists(data);
+    } catch (err) {
+      console.error('Error cargando mis playlists', err);
+      setPlaylistError('No se pudieron cargar tus playlists.');
+    } finally {
+      setLoadingMyPlaylists(false);
+    }
+  };
+
+  const loadPublicPlaylists = async () => {
+    try {
+      setLoadingPublicPlaylists(true);
+      const data = await fetchPublicPlaylists();
+      setPublicPlaylists(data);
+    } catch (err) {
+      console.error('Error cargando playlists públicas', err);
+      setPlaylistError('No se pudieron cargar las playlists públicas.');
+    } finally {
+      setLoadingPublicPlaylists(false);
+    }
+  };
+
+  const loadPlaylistDetail = async (playlistId, scope = 'mine') => {
+    try {
+      setPlaylistError(null);
+      const detail = await fetchPlaylistDetail(playlistId);
+      setSelectedPlaylistDetail(detail);
+      setSelectedPlaylistScope(scope);
+    } catch (err) {
+      console.error('Error cargando playlist', err);
+      setPlaylistError('No se pudo cargar la playlist seleccionada.');
+    }
+  };
 
   const handleSelectArtist = async (artist) => {
     setSelectedArtist(artist);
@@ -64,7 +175,7 @@ const TruSoundCloud = () => {
     }
   };
 
-  const handlePlayTrack = async (track) => {
+  const handlePlayTrack = (track) => {
     setCurrentTrack(track);
     setAudioUrl(buildTrackStreamUrl(track.id));
   };
@@ -86,14 +197,149 @@ const TruSoundCloud = () => {
     setSession(null);
     setArtists([]);
     setTracks([]);
+    setFavorites([]);
+    setMyPlaylists([]);
+    setPublicPlaylists([]);
+    setSelectedPlaylistDetail(null);
+    setSelectedPlaylistForAdd('');
     setAudioUrl(null);
     setCurrentTrack(null);
+    setSelectedTab('tracks');
+  };
+
+  const handleToggleFavorite = async (track) => {
+    try {
+      if (favoriteIds.has(track.id)) {
+        await removeFavorite(track.id);
+      } else {
+        await addFavorite(track.id);
+      }
+      await loadFavorites();
+    } catch (err) {
+      console.error('Error actualizando favoritos', err);
+      setFavoriteError('No se pudo actualizar la lista de favoritos.');
+    }
+  };
+
+  const handleAddTrackToPlaylist = async (track) => {
+    if (!selectedPlaylistForAdd) {
+      setPlaylistError('Selecciona una playlist para añadir canciones.');
+      return;
+    }
+    try {
+      setPlaylistError(null);
+      const playlistId = Number(selectedPlaylistForAdd);
+      await addTrackToPlaylist(playlistId, track.id);
+      setActionMessage('Canción añadida a la playlist.');
+      if (selectedPlaylistDetail?.playlist?.id === playlistId) {
+        await loadPlaylistDetail(playlistId, selectedPlaylistScope);
+      }
+    } catch (err) {
+      console.error('Error añadiendo canción a playlist', err);
+      const message =
+        err?.response?.data?.message ||
+        'No pudimos añadir la canción a la playlist.';
+      setPlaylistError(message);
+    }
+  };
+
+  const handleRemoveTrackFromPlaylist = async (track) => {
+    const playlistId = selectedPlaylistDetail?.playlist?.id;
+    if (!playlistId) return;
+    try {
+      await removeTrackFromPlaylist(playlistId, track.id);
+      setActionMessage('Canción eliminada de la playlist.');
+      await loadPlaylistDetail(playlistId, selectedPlaylistScope);
+    } catch (err) {
+      console.error('Error quitando canción de playlist', err);
+      setPlaylistError('No se pudo quitar la canción de la playlist.');
+    }
+  };
+
+  const handleCreatePlaylist = async (e) => {
+    e.preventDefault();
+    if (!newPlaylist.name.trim()) {
+      setPlaylistError('El nombre de la playlist es obligatorio.');
+      return;
+    }
+    try {
+      setCreatingPlaylist(true);
+      setPlaylistError(null);
+      const payload = {
+        name: newPlaylist.name.trim(),
+        description: newPlaylist.description.trim()
+          ? newPlaylist.description.trim()
+          : undefined,
+        is_public: newPlaylist.is_public,
+      };
+      await createPlaylist(payload);
+      setActionMessage('Playlist creada correctamente.');
+      setNewPlaylist({ name: '', description: '', is_public: true });
+      await loadMyPlaylists();
+    } catch (err) {
+      console.error('Error creando playlist', err);
+      setPlaylistError('No se pudo crear la playlist.');
+    } finally {
+      setCreatingPlaylist(false);
+    }
+  };
+
+  const handleSelectPlaylistCard = async (playlist, scope) => {
+    setSelectedPlaylistDetail(null);
+    await loadPlaylistDetail(playlist.id, scope);
+  };
+
+  const handleDeletePlaylist = async (playlistId) => {
+    const confirmDelete = window.confirm(
+      '¿Eliminar esta playlist? No se puede deshacer.',
+    );
+    if (!confirmDelete) return;
+    try {
+      await deletePlaylist(playlistId);
+      setActionMessage('Playlist eliminada.');
+      await loadMyPlaylists();
+      if (selectedPlaylistDetail?.playlist?.id === playlistId) {
+        setSelectedPlaylistDetail(null);
+      }
+    } catch (err) {
+      console.error('Error eliminando playlist', err);
+      setPlaylistError('No se pudo eliminar la playlist.');
+    }
   };
 
   const subtitle = useMemo(() => {
     if (!selectedArtist) return 'Selecciona un artista para empezar.';
     return `${selectedArtist.name} · ${tracks.length} canciones disponibles`;
   }, [selectedArtist, tracks.length]);
+
+  const playlistTracks = selectedPlaylistDetail?.tracks ?? [];
+  const canEditPlaylist =
+    selectedPlaylistScope === 'mine' &&
+    selectedPlaylistDetail?.playlist?.user_id === session?.user?.id;
+
+  const renderTrackList = (list, { enableAdd = false, enableRemove = false } = {}) => (
+    <div className="tracks-panel">
+      {list.length === 0 && <p>No hay canciones disponibles.</p>}
+      {list.map((track) => (
+        <TrackRow
+          key={track.id}
+          track={track}
+          isActive={track.id === currentTrack?.id}
+          onPlay={handlePlayTrack}
+          isFavorite={favoriteIds.has(track.id)}
+          onToggleFavorite={handleToggleFavorite}
+          onAddToPlaylist={
+            enableAdd && myPlaylists.length
+              ? () => handleAddTrackToPlaylist(track)
+              : undefined
+          }
+          onRemoveFromPlaylist={
+            enableRemove ? () => handleRemoveTrackFromPlaylist(track) : undefined
+          }
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div className="trusound-page">
@@ -136,38 +382,255 @@ const TruSoundCloud = () => {
         </aside>
 
         <section className="content">
-          <header className="hero">
-            <div>
-              <p className="eyebrow">PLAYLIST DESTACADA</p>
-              <h2>{selectedArtist?.name || 'Explora TruSoundCloud'}</h2>
-              <p>{subtitle}</p>
-            </div>
-            {selectedArtist && (
+          <div className="tab-bar">
+            {TABS.map((tab) => (
               <button
+                key={tab.id}
                 type="button"
-                className="primary"
-                onClick={() => handleSelectArtist(selectedArtist)}
-                disabled={loadingTracks}
+                className={selectedTab === tab.id ? 'active' : ''}
+                onClick={() => {
+                  setSelectedTab(tab.id);
+                  if (tab.id === 'my-playlists') {
+                    setSelectedPlaylistScope('mine');
+                  } else if (tab.id === 'public-playlists') {
+                    setSelectedPlaylistScope('public');
+                  }
+                }}
               >
-                {loadingTracks ? 'Actualizando...' : 'Actualizar lista'}
+                {tab.label}
               </button>
-            )}
-          </header>
-
-          <div className="tracks-panel">
-            {loadingTracks && <p>Cargando canciones...</p>}
-            {!loadingTracks && tracks.length === 0 && (
-              <p>Este artista todavía no tiene canciones.</p>
-            )}
-            {tracks.map((track) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                isActive={track.id === currentTrack?.id}
-                onPlay={handlePlayTrack}
-              />
             ))}
           </div>
+
+          {actionMessage && <p className="success">{actionMessage}</p>}
+          {playlistError && <p className="error">{playlistError}</p>}
+
+          {selectedTab === 'tracks' && (
+            <>
+              <header className="hero">
+                <div>
+                  <p className="eyebrow">PLAYLIST DESTACADA</p>
+                  <h2>{selectedArtist?.name || 'Explora TruSoundCloud'}</h2>
+                  <p>{subtitle}</p>
+                </div>
+                {selectedArtist && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => handleSelectArtist(selectedArtist)}
+                    disabled={loadingTracks}
+                  >
+                    {loadingTracks ? 'Actualizando...' : 'Actualizar lista'}
+                  </button>
+                )}
+              </header>
+
+              {myPlaylists.length > 0 && (
+                <div className="add-playlist-widget">
+                  <label htmlFor="playlistSelect">
+                    Selecciona una playlist para añadir canciones:
+                  </label>
+                  <select
+                    id="playlistSelect"
+                    value={selectedPlaylistForAdd}
+                    onChange={(e) => setSelectedPlaylistForAdd(e.target.value)}
+                  >
+                    <option value="">-- Selecciona --</option>
+                    {myPlaylists.map((playlist) => (
+                      <option key={playlist.id} value={playlist.id}>
+                        {playlist.name}
+                        {playlist.is_public ? ' · Pública' : ' · Privada'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {renderTrackList(tracks, { enableAdd: true })}
+            </>
+          )}
+
+          {selectedTab === 'favorites' && (
+            <div className="favorites-panel">
+              <h3>Mis favoritos</h3>
+              {loadingFavorites && <p>Cargando favoritos...</p>}
+              {favoriteError && <p className="error">{favoriteError}</p>}
+              {!loadingFavorites && favorites.length === 0 && (
+                <p>Todavía no tienes canciones favoritas.</p>
+              )}
+              {renderTrackList(favorites, { enableAdd: true })}
+            </div>
+          )}
+
+          {selectedTab === 'my-playlists' && (
+            <div className="playlist-layout">
+              <div className="playlist-column">
+                <h3>Mis playlists</h3>
+                {loadingMyPlaylists && <p>Cargando...</p>}
+                <div className="playlist-list">
+                  {myPlaylists.map((playlist) => (
+                    <div
+                      key={playlist.id}
+                      className={`playlist-card ${
+                        selectedPlaylistDetail?.playlist?.id === playlist.id &&
+                        selectedPlaylistScope === 'mine'
+                          ? 'active'
+                          : ''
+                      }`}
+                      onClick={() => handleSelectPlaylistCard(playlist, 'mine')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSelectPlaylistCard(playlist, 'mine');
+                      }}
+                    >
+                      <div>
+                        <h4>{playlist.name}</h4>
+                        <small>
+                          {playlist.is_public ? 'Pública' : 'Privada'} ·{' '}
+                          {new Date(playlist.created_at).toLocaleDateString()}
+                        </small>
+                      </div>
+                      <div className="playlist-actions">
+                        <button
+                          type="button"
+                          className="icon-btn remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePlaylist(playlist.id);
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!loadingMyPlaylists && myPlaylists.length === 0 && (
+                    <p>Aún no has creado playlists.</p>
+                  )}
+                </div>
+
+                <form className="playlist-form" onSubmit={handleCreatePlaylist}>
+                  <h4>Crear playlist</h4>
+                  <input
+                    type="text"
+                    placeholder="Nombre"
+                    value={newPlaylist.name}
+                    onChange={(e) =>
+                      setNewPlaylist((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    required
+                  />
+                  <textarea
+                    placeholder="Descripción (opcional)"
+                    value={newPlaylist.description}
+                    onChange={(e) =>
+                      setNewPlaylist((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={newPlaylist.is_public}
+                      onChange={(e) =>
+                        setNewPlaylist((prev) => ({
+                          ...prev,
+                          is_public: e.target.checked,
+                        }))
+                      }
+                    />
+                    Playlist pública
+                  </label>
+                  <button type="submit" disabled={creatingPlaylist}>
+                    {creatingPlaylist ? 'Creando...' : 'Crear playlist'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="playlist-detail">
+                {selectedPlaylistDetail && selectedPlaylistScope === 'mine' ? (
+                  <>
+                    <header>
+                      <div>
+                        <p className="eyebrow">Playlist seleccionada</p>
+                        <h3>{selectedPlaylistDetail.playlist.name}</h3>
+                        <small>
+                          {selectedPlaylistDetail.playlist.is_public
+                            ? 'Pública'
+                            : 'Privada'}{' '}
+                          · {selectedPlaylistDetail.playlist.owner_email}
+                        </small>
+                      </div>
+                    </header>
+                    {renderTrackList(playlistTracks, {
+                      enableRemove: canEditPlaylist,
+                      enableAdd: false,
+                    })}
+                  </>
+                ) : (
+                  <p>Selecciona una playlist para ver sus canciones.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedTab === 'public-playlists' && (
+            <div className="playlist-layout">
+              <div className="playlist-column">
+                <h3>Playlists públicas</h3>
+                {loadingPublicPlaylists && <p>Cargando...</p>}
+                <div className="playlist-list">
+                  {publicPlaylists.map((playlist) => (
+                    <div
+                      key={playlist.id}
+                      className={`playlist-card ${
+                        selectedPlaylistDetail?.playlist?.id === playlist.id &&
+                        selectedPlaylistScope === 'public'
+                          ? 'active'
+                          : ''
+                      }`}
+                      onClick={() => handleSelectPlaylistCard(playlist, 'public')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSelectPlaylistCard(playlist, 'public');
+                      }}
+                    >
+                      <div>
+                        <h4>{playlist.name}</h4>
+                        <small>{playlist.owner_email}</small>
+                      </div>
+                    </div>
+                  ))}
+                  {!loadingPublicPlaylists && publicPlaylists.length === 0 && (
+                    <p>No hay playlists públicas disponibles.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="playlist-detail">
+                {selectedPlaylistDetail && selectedPlaylistScope === 'public' ? (
+                  <>
+                    <header>
+                      <div>
+                        <p className="eyebrow">Playlist pública</p>
+                        <h3>{selectedPlaylistDetail.playlist.name}</h3>
+                        <small>
+                          Por {selectedPlaylistDetail.playlist.owner_email}
+                        </small>
+                      </div>
+                    </header>
+                    {renderTrackList(playlistTracks)}
+                  </>
+                ) : (
+                  <p>Selecciona una playlist pública para ver su contenido.</p>
+                )}
+              </div>
+            </div>
+          )}
         </section>
       </main>
 
@@ -278,6 +741,27 @@ const TruSoundCloud = () => {
           gap: 1.5rem;
         }
 
+        .tab-bar {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .tab-bar button {
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          color: #fff;
+          border-radius: 999px;
+          padding: 0.4rem 1rem;
+          cursor: pointer;
+          font-weight: 500;
+        }
+
+        .tab-bar button.active {
+          background: #22d3ee;
+          color: #0f172a;
+        }
+
         .hero {
           display: flex;
           justify-content: space-between;
@@ -311,7 +795,7 @@ const TruSoundCloud = () => {
 
         .track-row {
           display: grid;
-          grid-template-columns: auto 1fr auto;
+          grid-template-columns: auto 1fr auto auto;
           align-items: center;
           gap: 1rem;
           padding: 0.9rem 1.2rem;
@@ -343,6 +827,34 @@ const TruSoundCloud = () => {
           display: flex;
           gap: 0.8rem;
           color: rgba(255,255,255,0.75);
+        }
+
+        .track-actions {
+          display: flex;
+          gap: 0.4rem;
+        }
+
+        .icon-btn {
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 10px;
+          padding: 0.2rem 0.5rem;
+          color: #fff;
+          cursor: pointer;
+          font-size: 0.9rem;
+          transition: background 0.2s, border 0.2s;
+        }
+
+        .icon-btn.heart.active {
+          border-color: #f87171;
+        }
+
+        .icon-btn.add {
+          border-color: #34d399;
+        }
+
+        .icon-btn.remove {
+          border-color: #f87171;
         }
 
         .player-bar {
@@ -426,6 +938,104 @@ const TruSoundCloud = () => {
           color: #f87171;
         }
 
+        .success {
+          color: #34d399;
+          font-weight: 500;
+        }
+
+        .favorites-panel,
+        .playlist-layout {
+          background: rgba(15,23,42,0.45);
+          border-radius: 20px;
+          padding: 1.5rem;
+        }
+
+        .playlist-layout {
+          display: flex;
+          gap: 1.5rem;
+        }
+
+        .playlist-column {
+          width: 320px;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .playlist-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+
+        .playlist-card {
+          border-radius: 14px;
+          padding: 0.9rem 1rem;
+          background: rgba(255,255,255,0.05);
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .playlist-card.active {
+          background: rgba(99,102,241,0.3);
+        }
+
+        .playlist-detail {
+          flex: 1;
+          background: rgba(15,23,42,0.35);
+          border-radius: 18px;
+          padding: 1.5rem;
+          min-height: 300px;
+        }
+
+        .playlist-form {
+          background: rgba(255,255,255,0.03);
+          border-radius: 14px;
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.7rem;
+        }
+
+        .playlist-form input,
+        .playlist-form textarea,
+        .add-playlist-widget select {
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 10px;
+          padding: 0.6rem 0.8rem;
+          color: #fff;
+        }
+
+        .playlist-form textarea {
+          min-height: 80px;
+          resize: vertical;
+        }
+
+        .playlist-form button,
+        .add-playlist-widget select {
+          font-family: inherit;
+        }
+
+        .checkbox {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.9rem;
+        }
+
+        .add-playlist-widget {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .playlist-detail header {
+          margin-bottom: 1rem;
+        }
+
         @media (max-width: 960px) {
           .trusound-layout {
             flex-direction: column;
@@ -443,6 +1053,14 @@ const TruSoundCloud = () => {
           }
           .track-meta {
             justify-content: space-between;
+          }
+
+          .playlist-layout {
+            flex-direction: column;
+          }
+
+          .playlist-column {
+            width: 100%;
           }
         }
       `}</style>
