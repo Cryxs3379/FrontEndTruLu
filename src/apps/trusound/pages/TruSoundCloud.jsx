@@ -56,6 +56,15 @@ const formatTime = (seconds = 0) => {
   return `${mins}:${secs}`;
 };
 
+const formatDuration = (seconds = 0) => {
+  if (!Number.isFinite(seconds) || !seconds) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
+  return `${mins}:${secs}`;
+};
+
 const TruSoundCloud = () => {
   const [session, setSession] = useState(getTruSoundSession());
   const [artists, setArtists] = useState([]);
@@ -492,26 +501,37 @@ const TruSoundCloud = () => {
   ) => (
     <div className="tracks-panel">
       {list.length === 0 && <p>No hay canciones disponibles.</p>}
-      {list.map((track, index) => (
-        <TrackRow
-          key={track.id}
-          track={track}
-          isActive={track.id === currentTrack?.id}
-          onPlay={() => handlePlayFromList(playSourceList, index)}
-          isFavorite={favoriteIds.has(track.id)}
-          onToggleFavorite={handleToggleFavorite}
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
-          onAddToPlaylist={
-            enableAdd && myPlaylists.length
-              ? () => handleAddTrackToPlaylist(track)
-              : undefined
+      {list.map((track, index) => {
+        const isActiveTrack = track.id === currentTrack?.id;
+        const handleTrackPlay = () => {
+          if (isActiveTrack && isPlaying) {
+            togglePlayback();
+          } else {
+            handlePlayFromList(playSourceList, index);
           }
-          onRemoveFromPlaylist={
-            enableRemove ? () => handleRemoveTrackFromPlaylist(track) : undefined
-          }
-        />
-      ))}
+        };
+        return (
+          <TrackRow
+            key={track.id}
+            track={track}
+            isActive={isActiveTrack}
+            isPlaying={isActiveTrack && isPlaying}
+            onPlay={handleTrackPlay}
+            isFavorite={favoriteIds.has(track.id)}
+            onToggleFavorite={handleToggleFavorite}
+            onSwipeLeft={handleSwipeLeft}
+            onSwipeRight={handleSwipeRight}
+            onAddToPlaylist={
+              enableAdd && myPlaylists.length
+                ? () => handleAddTrackToPlaylist(track)
+                : undefined
+            }
+            onRemoveFromPlaylist={
+              enableRemove ? () => handleRemoveTrackFromPlaylist(track) : undefined
+            }
+          />
+        );
+      })}
     </div>
   );
 
@@ -1682,6 +1702,135 @@ const TruSoundCloud = () => {
           }
           .track-meta {
             justify-content: flex-start;
+          }
+        }
+
+        .login-overlay {
+          position: fixed;
+          inset: 0;
+          background: radial-gradient(circle at top, var(--accent-1, #4f46e5), #020617 70%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+
+        .login-container {
+          width: 100%;
+          max-width: 420px;
+        }
+
+        .login-panel {
+          background: rgba(2,6,23,0.95);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 24px;
+          padding: 2.5rem clamp(1.5rem, 4vw, 2.5rem);
+          box-shadow: 0 30px 60px rgba(2,6,23,0.9);
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+
+        .login-header {
+          text-align: center;
+        }
+
+        .login-header h2 {
+          margin: 0 0 0.5rem 0;
+          font-size: clamp(1.8rem, 4vw, 2.2rem);
+          color: #fff;
+          font-weight: 700;
+        }
+
+        .login-header p {
+          margin: 0;
+          color: rgba(226,232,240,0.7);
+          font-size: clamp(0.9rem, 2vw, 1rem);
+        }
+
+        .login-fields {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .login-panel input {
+          background: rgba(15,23,42,0.8);
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 12px;
+          padding: 0.9rem 1.1rem;
+          color: #e5e7eb;
+          font-size: 1rem;
+          outline: none;
+          transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .login-panel input::placeholder {
+          color: rgba(226,232,240,0.5);
+        }
+
+        .login-panel input:focus {
+          border-color: var(--accent-1, #4f46e5);
+          background: rgba(15,23,42,0.95);
+        }
+
+        .login-panel input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .login-error {
+          background: rgba(239,68,68,0.15);
+          border: 1px solid rgba(239,68,68,0.3);
+          color: #fca5a5;
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          font-size: 0.9rem;
+          text-align: center;
+        }
+
+        .login-submit {
+          background: linear-gradient(135deg, var(--accent-1, #4f46e5), var(--accent-2, #6366f1));
+          border: none;
+          border-radius: 12px;
+          padding: 0.95rem 1.5rem;
+          color: #020617;
+          font-weight: 600;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: transform 0.15s ease, opacity 0.2s ease;
+          width: 100%;
+        }
+
+        .login-submit:hover:not(:disabled) {
+          transform: translateY(-1px);
+        }
+
+        .login-submit:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .login-submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 480px) {
+          .login-panel {
+            padding: 2rem 1.5rem;
+            border-radius: 20px;
+          }
+
+          .login-header h2 {
+            font-size: 1.6rem;
+          }
+
+          .login-panel input,
+          .login-submit {
+            padding: 0.85rem 1rem;
+            font-size: 0.95rem;
           }
         }
       `}</style>

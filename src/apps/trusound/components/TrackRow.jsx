@@ -29,6 +29,7 @@ const Icon = ({ path, size = 20 }) => (
 const TrackRow = ({
   track,
   isActive,
+  isPlaying = false,
   onPlay,
   isFavorite = false,
   onToggleFavorite,
@@ -60,11 +61,11 @@ const TrackRow = ({
     >
       <button
         type="button"
-        onClick={() => onPlay?.(track)}
+        onClick={() => onPlay?.()}
         className="play-btn"
-        aria-label={isActive ? 'Pausar' : 'Reproducir'}
+        aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
       >
-        {isActive ? (
+        {isPlaying ? (
           <Icon path="M9 5v14M15 5v14" />
         ) : (
           <Icon path="M7 4l12 8-12 8z" />

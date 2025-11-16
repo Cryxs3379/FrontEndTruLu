@@ -17,28 +17,38 @@ const LoginPanel = ({ onSubmit, errorMessage }) => {
   };
 
   return (
-    <form className="login-panel" onSubmit={handleSubmit}>
-      <h3>TruSoundCloud</h3>
-      <p>Inicia sesión para acceder a tu biblioteca musical.</p>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      {errorMessage && <span className="error">{errorMessage}</span>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Conectando...' : 'Entrar'}
-      </button>
-    </form>
+    <div className="login-container">
+      <form className="login-panel" onSubmit={handleSubmit}>
+        <div className="login-header">
+          <h2>🎧 TruSoundCloud</h2>
+          <p>Inicia sesión para acceder a tu biblioteca musical</p>
+        </div>
+        <div className="login-fields">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="email"
+          />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="current-password"
+          />
+          {errorMessage && <div className="login-error">{errorMessage}</div>}
+        </div>
+        <button type="submit" className="login-submit" disabled={loading}>
+          {loading ? 'Conectando...' : 'Entrar'}
+        </button>
+      </form>
+    </div>
   );
 };
 
