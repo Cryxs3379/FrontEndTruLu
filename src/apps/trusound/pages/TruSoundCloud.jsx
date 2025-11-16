@@ -607,6 +607,25 @@ const TruSoundCloud = () => {
 
         <section className="content">
           <div className="content-header">
+            <button
+              className="mobile-artists-btn"
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              title="Ver artistas"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                <path
+                  d="M4 6h16M4 12h16M4 18h16"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span>Artistas</span>
+              {artists.length > 0 && (
+                <span className="artists-badge">{artists.length}</span>
+              )}
+            </button>
             <div className="tab-bar">
               {TABS.map((tab) => (
                 <button
@@ -1263,6 +1282,7 @@ const TruSoundCloud = () => {
           border: 1px solid rgba(255,255,255,0.06);
           box-shadow: 0 30px 60px rgba(2,6,23,0.85);
           min-width: 0;
+          padding-bottom: clamp(1.4rem, 8vw, 2rem);
         }
 
         .content-header {
@@ -1419,10 +1439,27 @@ const TruSoundCloud = () => {
 
         .track-meta {
           display: flex;
-          gap: 0.6rem;
-          color: rgba(226,232,240,0.8);
-          font-size: 0.75rem;
-          justify-content: flex-end;
+          flex-direction: column;
+          gap: 0.2rem;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .track-meta strong {
+          font-size: 0.95rem;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.3;
+        }
+
+        .track-meta span {
+          font-size: 0.8rem;
+          color: rgba(226,232,240,0.7);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .track-actions {
@@ -1521,6 +1558,7 @@ const TruSoundCloud = () => {
           bottom: 1rem;
           width: min(960px, calc(100% - 1.2rem));
           background: rgba(1,3,10,0.95);
+          backdrop-filter: blur(20px);
           border: 1px solid rgba(255,255,255,0.07);
           border-radius: 20px;
           padding: 0.9rem 1.3rem;
@@ -1682,26 +1720,166 @@ const TruSoundCloud = () => {
           }
         }
 
+        .mobile-artists-btn {
+          display: none;
+          align-items: center;
+          gap: 0.5rem;
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+          border: none;
+          border-radius: 12px;
+          padding: 0.6rem 1rem;
+          color: #020617;
+          font-weight: 600;
+          font-size: 0.9rem;
+          cursor: pointer;
+          margin-bottom: 0.8rem;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .mobile-artists-btn:active {
+          transform: translateY(1px);
+        }
+
+        .artists-badge {
+          background: rgba(2,6,23,0.3);
+          border-radius: 999px;
+          padding: 0.15rem 0.5rem;
+          font-size: 0.75rem;
+          font-weight: 700;
+          min-width: 1.5rem;
+          text-align: center;
+        }
+
         @media (max-width: 768px) {
+          .mobile-artists-btn {
+            display: inline-flex;
+          }
+
           .player-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 0.75rem 1rem 1rem;
+            display: flex;
             flex-direction: column;
+            gap: 0.75rem;
             align-items: stretch;
+            box-shadow: 0 -8px 24px rgba(2,6,23,0.8);
+            backdrop-filter: blur(20px);
+            border-left: none;
+            border-right: none;
+            border-bottom: none;
           }
-          .player-controls {
-            flex-direction: column;
-          }
+
           .mini-left {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            min-width: 0;
             width: 100%;
           }
+
           .artwork-chip {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 12px;
+          }
+
+          .track-meta {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+          }
+
+          .track-meta strong {
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+          }
+
+          .track-meta span {
+            font-size: 0.75rem;
+            color: rgba(226,232,240,0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .eq-indicator {
+            display: none;
+          }
+
+          .player-controls {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+          }
+
+          .control-btn {
             width: 44px;
             height: 44px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(15,23,42,0.8);
+            color: #e5e7eb;
+            cursor: pointer;
+            flex-shrink: 0;
           }
+
+          .control-btn.primary-btn {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            border: none;
+            color: #020617;
+          }
+
+          .progress-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            order: -1;
+          }
+
+          .progress-group span {
+            font-size: 0.7rem;
+            color: rgba(226,232,240,0.8);
+            min-width: 2.5rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+          }
+
+          .progress-group input[type="range"] {
+            flex: 1;
+            height: 4px;
+            accent-color: var(--accent-1);
+          }
+
           .track-row {
             grid-template-columns: auto minmax(0, 1fr);
           }
+
           .track-meta {
             justify-content: flex-start;
+          }
+
+          .content {
+            padding-bottom: 6rem;
           }
         }
 
