@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = '/api';
+const API_BASE =
+  (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://10.0.0.10:3000') + '/api';
 
 const authClient = axios.create({
   baseURL: API_BASE,
