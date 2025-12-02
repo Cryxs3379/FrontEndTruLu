@@ -11,6 +11,7 @@ import {
   getTruSoundSession,
   fetchArtists,
   fetchArtistTracks,
+  fetchArtistAlbums,
   buildTrackStreamUrl,
   fetchFavorites,
   addFavorite,
@@ -24,6 +25,7 @@ import {
   deletePlaylist,
 } from '../api/api';
 import ArtistCard from '../components/ArtistCard';
+import AlbumCard from '../components/AlbumCard';
 import TrackRow from '../components/TrackRow';
 import LoginPanel from '../components/LoginPanel';
 
@@ -69,6 +71,8 @@ const TruSoundCloud = () => {
   const [session, setSession] = useState(getTruSoundSession());
   const [artists, setArtists] = useState([]);
   const [selectedArtist, setSelectedArtist] = useState(null);
+  const [albums, setAlbums] = useState([]);
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -76,6 +80,7 @@ const TruSoundCloud = () => {
   const [currentIndex, setCurrentIndex] = useState(null);
   const audioRef = useRef(null);
   const [loadingArtists, setLoadingArtists] = useState(false);
+  const [loadingAlbums, setLoadingAlbums] = useState(false);
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [loginError, setLoginError] = useState(null);
@@ -263,17 +268,24 @@ const TruSoundCloud = () => {
 
   const handleSelectArtist = async (artist) => {
     setSelectedArtist(artist);
+    setAlbums([]);
+    setSelectedAlbum(null);
     setTracks([]);
-    setLoadingTracks(true);
+    setLoadingAlbums(true);
     try {
-      const data = await fetchArtistTracks(artist.id);
-      setTracks(data);
+      const data = await fetchArtistAlbums(artist.id);
+      setAlbums(data);
     } catch (err) {
-      console.error('Error cargando tracks', err);
-      setErrorMessage('No se pudieron cargar las canciones de este artista.');
+      console.error('Error cargando álbumes', err);
+      setErrorMessage('No se pudieron cargar los álbumes de este artista.');
     } finally {
-      setLoadingTracks(false);
+      setLoadingAlbums(false);
     }
+  };
+
+  const handleSelectAlbum = (album) => {
+    setSelectedAlbum(album);
+    setTracks(album.tracks || []);
   };
 
   const playTrackAtIndex = (index, queue = playQueue) => {
@@ -370,6 +382,8 @@ const TruSoundCloud = () => {
     logoutTruSound();
     setSession(null);
     setArtists([]);
+    setAlbums([]);
+    setSelectedAlbum(null);
     setTracks([]);
     setFavorites([]);
     setMyPlaylists([]);
@@ -483,8 +497,12 @@ const TruSoundCloud = () => {
 
   const subtitle = useMemo(() => {
     if (!selectedArtist) return 'Selecciona un artista para empezar.';
-    return `${selectedArtist.name} · ${tracks.length} canciones disponibles`;
-  }, [selectedArtist, tracks.length]);
+    if (!selectedAlbum) {
+      const totalTracks = albums.reduce((sum, album) => sum + (album.track_count || 0), 0);
+      return `${selectedArtist.name} · ${albums.length} álbumes · ${totalTracks} canciones`;
+    }
+    return `${selectedAlbum.name} · ${tracks.length} canciones`;
+  }, [selectedArtist, selectedAlbum, albums, tracks.length]);
 
   const playlistTracks = selectedPlaylistDetail?.tracks ?? [];
   const canEditPlaylist =
@@ -681,46 +699,90 @@ const TruSoundCloud = () => {
                   <header className="hero">
                     <div>
                       <p className="eyebrow">PLAYLIST DESTACADA</p>
-                      <h2>{selectedArtist?.name || 'Explora TruSoundCloud'}</h2>
+                      <h2>
+                        {selectedAlbum
+                          ? selectedAlbum.name
+                          : selectedArtist?.name || 'Explora TruSoundCloud'}
+                      </h2>
                       <p>{subtitle}</p>
                     </div>
-                    {selectedArtist && (
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={() => handleSelectArtist(selectedArtist)}
-                        disabled={loadingTracks}
-                      >
-                        {loadingTracks ? 'Actualizando...' : 'Actualizar lista'}
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {selectedAlbum && (
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            setSelectedAlbum(null);
+                            setTracks([]);
+                          }}
+                        >
+                          ← Volver a álbumes
+                        </button>
+                      )}
+                      {selectedArtist && (
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() => handleSelectArtist(selectedArtist)}
+                          disabled={loadingAlbums}
+                        >
+                          {loadingAlbums ? 'Actualizando...' : 'Actualizar lista'}
+                        </button>
+                      )}
+                    </div>
                   </header>
 
-                  {myPlaylists.length > 0 && (
-                    <div className="add-playlist-widget">
-                      <label htmlFor="playlistSelect">
-                        Selecciona una playlist para añadir canciones:
-                      </label>
-                      <select
-                        id="playlistSelect"
-                        value={selectedPlaylistForAdd}
-                        onChange={(e) => setSelectedPlaylistForAdd(e.target.value)}
-                      >
-                        <option value="">-- Selecciona --</option>
-                        {myPlaylists.map((playlist) => (
-                          <option key={playlist.id} value={playlist.id}>
-                            {playlist.name}
-                            {playlist.is_public ? ' · Pública' : ' · Privada'}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  {!selectedAlbum ? (
+                    <>
+                      {loadingAlbums && <p>Cargando álbumes...</p>}
+                      {!loadingAlbums && albums.length === 0 && selectedArtist && (
+                        <p>Este artista no tiene álbumes disponibles.</p>
+                      )}
+                      {!loadingAlbums && albums.length > 0 && (
+                        <div className="albums-panel">
+                          <h3>Álbumes</h3>
+                          <div className="albums-grid">
+                            {albums.map((album) => (
+                              <AlbumCard
+                                key={album.name}
+                                album={album}
+                                isActive={selectedAlbum?.name === album.name}
+                                onSelect={handleSelectAlbum}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {myPlaylists.length > 0 && (
+                        <div className="add-playlist-widget">
+                          <label htmlFor="playlistSelect">
+                            Selecciona una playlist para añadir canciones:
+                          </label>
+                          <select
+                            id="playlistSelect"
+                            value={selectedPlaylistForAdd}
+                            onChange={(e) => setSelectedPlaylistForAdd(e.target.value)}
+                          >
+                            <option value="">-- Selecciona --</option>
+                            {myPlaylists.map((playlist) => (
+                              <option key={playlist.id} value={playlist.id}>
+                                {playlist.name}
+                                {playlist.is_public ? ' · Pública' : ' · Privada'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                  {renderTrackList(tracks, {
-                    enableAdd: true,
-                    playSourceList: tracks,
-                  })}
+                      {renderTrackList(tracks, {
+                        enableAdd: true,
+                        playSourceList: tracks,
+                      })}
+                    </>
+                  )}
                 </motion.section>
               )}
 
@@ -1377,6 +1439,80 @@ const TruSoundCloud = () => {
           gap: 0.6rem;
         }
 
+        .albums-panel {
+          background: rgba(7,9,20,0.85);
+          border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.05);
+          padding: 1.2rem;
+        }
+
+        .albums-panel h3 {
+          margin: 0 0 1rem 0;
+          font-size: 1.1rem;
+          color: #fff;
+        }
+
+        .albums-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 1rem;
+        }
+
+        .album-card {
+          border: 1px solid rgba(255,255,255,0.06);
+          text-align: left;
+          padding: 1rem;
+          border-radius: 16px;
+          background: rgba(9,9,20,0.8);
+          color: #e5e7eb;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          transition: transform 0.15s ease-out, border 0.15s ease-out, box-shadow 0.15s ease-out;
+          width: 100%;
+        }
+
+        .album-card.active,
+        .album-card:hover {
+          border-color: rgba(255,255,255,0.35);
+          box-shadow: 0 15px 35px rgba(4,7,15,0.8);
+          transform: translateY(-2px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+        }
+
+        .album-artwork {
+          width: 100%;
+          aspect-ratio: 1;
+          border-radius: 14px;
+          background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 2rem;
+          color: #020617;
+        }
+
+        .album-info {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .album-info h4 {
+          margin: 0;
+          font-size: 1rem;
+          color: #fff;
+          font-weight: 600;
+        }
+
+        .album-info p {
+          margin: 0;
+          font-size: 0.85rem;
+          color: rgba(226,232,240,0.7);
+        }
+
         .track-row {
           display: grid;
           grid-template-columns: auto minmax(0, 1.2fr) auto auto;
@@ -1880,6 +2016,27 @@ const TruSoundCloud = () => {
 
           .content {
             padding-bottom: 6rem;
+          }
+
+          .albums-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.75rem;
+          }
+
+          .album-card {
+            padding: 0.85rem;
+          }
+
+          .album-artwork {
+            font-size: 1.5rem;
+          }
+
+          .album-info h4 {
+            font-size: 0.9rem;
+          }
+
+          .album-info p {
+            font-size: 0.8rem;
           }
         }
 

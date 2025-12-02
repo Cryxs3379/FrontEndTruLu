@@ -53,6 +53,13 @@ export const fetchArtistTracks = async (artistId) => {
   return data;
 };
 
+export const fetchArtistAlbums = async (artistId) => {
+  const { data } = await client.get(
+    `/TruSoundCloud/artists/${artistId}/albums`,
+  );
+  return data;
+};
+
 export const fetchTrack = async (trackId) => {
   const { data } = await client.get(`/TruSoundCloud/tracks/${trackId}`);
   return data;
