@@ -329,6 +329,84 @@ const TruSoundCloud = () => {
     else audioRef.current.pause();
   };
 
+  // Media Session API para controles en pantalla bloqueada
+  useEffect(() => {
+    if (!currentTrack || !('mediaSession' in navigator)) return;
+
+    const updateMediaSession = () => {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: activeArtistName,
+        album: currentTrack.album || selectedAlbum?.name || '',
+        artwork: [],
+      });
+
+      // Configurar acciones de Media Session
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (audioRef.current?.paused) {
+          audioRef.current.play();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (!audioRef.current?.paused) {
+          audioRef.current.pause();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        handlePrevTrack();
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        handleNextTrack();
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        if (audioRef.current) {
+          const skipTime = details.seekOffset || 10;
+          audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - skipTime);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        if (audioRef.current) {
+          const skipTime = details.seekOffset || 10;
+          audioRef.current.currentTime = Math.min(
+            audioRef.current.duration,
+            audioRef.current.currentTime + skipTime
+          );
+        }
+      });
+    };
+
+    updateMediaSession();
+
+    // Actualizar posición de reproducción
+    const updatePositionState = () => {
+      if (audioRef.current && 'setPositionState' in navigator.mediaSession) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audioRef.current.duration || 0,
+            playbackRate: audioRef.current.playbackRate || 1,
+            position: audioRef.current.currentTime || 0,
+          });
+        } catch (e) {
+          // Algunos navegadores no soportan setPositionState
+        }
+      }
+    };
+
+    const interval = setInterval(updatePositionState, 1000);
+
+    return () => {
+      clearInterval(interval);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null;
+      }
+    };
+  }, [currentTrack, activeArtistName, selectedAlbum, handlePrevTrack, handleNextTrack]);
+
   const handleQueueDragEnd = (result) => {
     if (!result.destination) return;
     const reordered = Array.from(playQueue);
@@ -1699,9 +1777,11 @@ const TruSoundCloud = () => {
         .track-info h5 {
           margin: 0;
           font-size: 0.95rem;
+          line-height: 1.4;
         }
         .track-info small {
           color: rgba(226,232,240,0.75);
+          margin-top: 0.15rem;
         }
         .track-info .eq-bars {
           display: inline-flex;
@@ -2066,8 +2146,33 @@ const TruSoundCloud = () => {
         }
 
         @media (max-width: 768px) {
+          .trusound-page {
+            padding-bottom: 6rem;
+          }
+
           .mobile-artists-btn {
             display: inline-flex;
+          }
+
+          .content {
+            padding: 1rem;
+            padding-bottom: 6rem;
+          }
+
+          .track-info h5 {
+            font-size: 0.875rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-word;
+          }
+
+          .track-info small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
           }
 
           .player-bar {
@@ -2077,19 +2182,17 @@ const TruSoundCloud = () => {
             bottom: 0;
             width: 100%;
             border-radius: 0;
-            padding: 0.75rem 1rem;
+            padding: 0.875rem 1rem;
             padding-bottom: max(1rem, env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.875rem;
             align-items: stretch;
             box-shadow: 0 -8px 24px rgba(2,6,23,0.8);
             backdrop-filter: blur(20px);
-            border-left: none;
-            border-right: none;
-            border-bottom: none;
             border-top: 1px solid rgba(255,255,255,0.1);
             box-sizing: border-box;
+            z-index: 1000;
           }
 
           .mini-left {
@@ -2102,8 +2205,8 @@ const TruSoundCloud = () => {
           }
 
           .artwork-chip {
-            width: 48px;
-            height: 48px;
+            width: 52px;
+            height: 52px;
             flex-shrink: 0;
             border-radius: 12px;
           }
@@ -2113,21 +2216,22 @@ const TruSoundCloud = () => {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 0.2rem;
+            gap: 0.15rem;
             overflow: hidden;
           }
 
           .track-meta strong {
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             line-height: 1.3;
+            font-weight: 600;
           }
 
           .track-meta span {
             font-size: 0.75rem;
-            color: rgba(226,232,240,0.7);
+            color: rgba(255,255,255,0.7);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2142,29 +2246,35 @@ const TruSoundCloud = () => {
             flex-direction: row;
             align-items: center;
             justify-content: center;
-            gap: 0.75rem;
+            gap: 1rem;
             width: 100%;
             flex-shrink: 0;
             padding: 0;
           }
 
           .control-btn {
-            width: 48px;
-            height: 48px;
-            min-width: 48px;
-            min-height: 48px;
+            width: 52px;
+            height: 52px;
+            min-width: 52px;
+            min-height: 52px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             border: 1px solid rgba(255,255,255,0.2);
-            background: rgba(15,23,42,0.9);
+            background: rgba(15,23,42,0.95);
             color: #e5e7eb;
             cursor: pointer;
             flex-shrink: 0;
             padding: 0;
             box-sizing: border-box;
             overflow: visible;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s ease;
+          }
+
+          .control-btn:active {
+            transform: scale(0.95);
           }
 
           .control-btn:disabled {
@@ -2173,25 +2283,25 @@ const TruSoundCloud = () => {
           }
 
           .control-btn.primary-btn {
-            width: 56px;
-            height: 56px;
-            min-width: 56px;
-            min-height: 56px;
+            width: 60px;
+            height: 60px;
+            min-width: 60px;
+            min-height: 60px;
             background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
             border: none;
             color: #020617;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
           }
 
           .control-btn svg {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             flex-shrink: 0;
           }
 
           .control-btn.primary-btn svg {
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
           }
 
           .progress-group {
@@ -2215,14 +2325,38 @@ const TruSoundCloud = () => {
 
           .progress-group input[type="range"] {
             flex: 1;
-            height: 4px;
+            height: 5px;
             accent-color: var(--accent-1);
             min-width: 0;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+          }
+
+          .progress-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-1);
+            cursor: pointer;
+          }
+
+          .progress-group input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-1);
+            cursor: pointer;
+            border: none;
           }
 
           .track-row {
             grid-template-columns: auto minmax(0, 1fr) auto;
-            padding: 0.5rem 0.5rem;
+            padding: 0.75rem 0.75rem;
+            gap: 0.75rem;
           }
 
           .track-meta {
@@ -2230,13 +2364,48 @@ const TruSoundCloud = () => {
           }
 
           .track-actions {
-            gap: 0.25rem;
+            gap: 0.5rem;
           }
 
           .icon-btn {
-            width: 36px;
-            height: 36px;
-            min-width: 36px;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            opacity: 1;
+          }
+
+          .artist-title {
+            font-size: 1.75rem;
+            line-height: 1.2;
+          }
+
+          .album-title {
+            font-size: 1.5rem;
+            line-height: 1.2;
+          }
+
+          .section-title {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+          }
+
+          .albums-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 1rem;
+          }
+
+          .album-artwork {
+            font-size: 1.75rem;
+          }
+
+          .album-info h4 {
+            font-size: 0.875rem;
+            min-height: 2.5rem;
+            line-height: 1.3;
+          }
+
+          .album-info p {
+            font-size: 0.8rem;
           }
 
           .content {
