@@ -2168,7 +2168,7 @@ const TruSoundCloud = () => {
 
           .content {
             padding: 1rem;
-            padding-bottom: calc(180px + env(safe-area-inset-bottom) + 56px);
+            padding-bottom: calc(120px + env(safe-area-inset-bottom));
             margin-bottom: 0;
           }
 
@@ -2204,11 +2204,11 @@ const TruSoundCloud = () => {
             width: 100vw !important;
             max-width: 100vw !important;
             border-radius: 0;
-            padding: 0.875rem 1rem;
-            padding-bottom: calc(0.875rem + env(safe-area-inset-bottom) + 56px);
+            padding: 0.75rem 0.875rem;
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
-            gap: 0.875rem;
+            gap: 0.625rem;
             align-items: stretch;
             box-shadow: 0 -8px 24px rgba(2,6,23,0.8);
             backdrop-filter: blur(20px);
@@ -2217,13 +2217,13 @@ const TruSoundCloud = () => {
             border-right: none !important;
             box-sizing: border-box;
             z-index: 1000;
-            min-height: calc(140px + env(safe-area-inset-bottom) + 56px);
             transform: none !important;
+            overflow: hidden;
           }
 
           .mini-left {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.625rem;
             align-items: center;
             min-width: 0;
             width: 100%;
@@ -2231,10 +2231,10 @@ const TruSoundCloud = () => {
           }
 
           .artwork-chip {
-            width: 52px;
-            height: 52px;
+            width: 44px;
+            height: 44px;
             flex-shrink: 0;
-            border-radius: 12px;
+            border-radius: 10px;
           }
 
           .track-meta {
@@ -2242,21 +2242,21 @@ const TruSoundCloud = () => {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 0.15rem;
+            gap: 0.1rem;
             overflow: hidden;
           }
 
           .track-meta strong {
-            font-size: 0.875rem;
+            font-size: 0.8125rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            line-height: 1.3;
+            line-height: 1.2;
             font-weight: 600;
           }
 
           .track-meta span {
-            font-size: 0.75rem;
+            font-size: 0.6875rem;
             color: rgba(255,255,255,0.7);
             white-space: nowrap;
             overflow: hidden;
@@ -2272,17 +2272,17 @@ const TruSoundCloud = () => {
             flex-direction: row;
             align-items: center;
             justify-content: center;
-            gap: 1rem;
+            gap: 0.75rem;
             width: 100%;
             flex-shrink: 0;
             padding: 0;
           }
 
           .control-btn {
-            width: 52px;
-            height: 52px;
-            min-width: 52px;
-            min-height: 52px;
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            min-height: 44px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
@@ -2309,10 +2309,10 @@ const TruSoundCloud = () => {
           }
 
           .control-btn.primary-btn {
-            width: 60px;
-            height: 60px;
-            min-width: 60px;
-            min-height: 60px;
+            width: 52px;
+            height: 52px;
+            min-width: 52px;
+            min-height: 52px;
             background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
             border: none;
             color: #020617;
@@ -2320,20 +2320,20 @@ const TruSoundCloud = () => {
           }
 
           .control-btn svg {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             flex-shrink: 0;
           }
 
           .control-btn.primary-btn svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
           }
 
           .progress-group {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
             width: 100%;
             order: -1;
             flex-shrink: 0;
@@ -2341,9 +2341,9 @@ const TruSoundCloud = () => {
           }
 
           .progress-group span {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: rgba(226,232,240,0.8);
-            min-width: 2.5rem;
+            min-width: 2.2rem;
             text-align: center;
             font-variant-numeric: tabular-nums;
             flex-shrink: 0;
@@ -2351,7 +2351,7 @@ const TruSoundCloud = () => {
 
           .progress-group input[type="range"] {
             flex: 1;
-            height: 5px;
+            height: 4px;
             accent-color: var(--accent-1);
             min-width: 0;
             -webkit-appearance: none;
