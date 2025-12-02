@@ -135,21 +135,39 @@ const TruSoundCloud = () => {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    
+    // Resetear estado cuando cambia la URL
+    setIsPlaying(false);
+    
     const handleTimeUpdate = () => {
       setProgress(audio.currentTime || 0);
       setDuration(audio.duration || 0);
     };
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+    const handleLoadedData = () => {
+      // Cuando se carga el audio, verificar el estado real
+      setIsPlaying(!audio.paused);
+    };
+    
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleTimeUpdate);
+    audio.addEventListener('loadeddata', handleLoadedData);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', () => setIsPlaying(false));
+    
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleTimeUpdate);
+      audio.removeEventListener('loadeddata', handleLoadedData);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', () => setIsPlaying(false));
     };
   }, [audioUrl]);
 
@@ -323,10 +341,37 @@ const TruSoundCloud = () => {
     setProgress(nextTime);
   };
 
-  const togglePlayback = () => {
+  const togglePlayback = async () => {
     if (!audioRef.current) return;
-    if (audioRef.current.paused) audioRef.current.play();
-    else audioRef.current.pause();
+    
+    // Usar el estado actual y el estado real del audio para determinar la acción
+    const shouldPlay = audioRef.current.paused && !isPlaying;
+    
+    try {
+      if (shouldPlay) {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } else {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error('Error al reproducir/pausar:', error);
+      // Si falla el play, intentar de nuevo después de un pequeño delay
+      if (shouldPlay) {
+        setTimeout(async () => {
+          try {
+            if (audioRef.current && audioRef.current.paused) {
+              await audioRef.current.play();
+              setIsPlaying(true);
+            }
+        } catch (retryError) {
+          console.error('Error al reintentar reproducir:', retryError);
+          setIsPlaying(false);
+        }
+        }, 100);
+      }
+    }
   };
 
   // Media Session API para controles en pantalla bloqueada
@@ -1284,6 +1329,10 @@ const TruSoundCloud = () => {
             autoPlay
             preload="metadata"
             onEnded={handleNextTrack}
+            onError={(e) => {
+              console.error('Error en audio:', e);
+              setIsPlaying(false);
+            }}
             style={{ display: 'none' }}
           />
         </footer>
