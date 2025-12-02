@@ -696,51 +696,46 @@ const TruSoundCloud = () => {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <header className="hero">
-                    <div>
-                      <p className="eyebrow">PLAYLIST DESTACADA</p>
-                      <h2>
-                        {selectedAlbum
-                          ? selectedAlbum.name
-                          : selectedArtist?.name || 'Explora TruSoundCloud'}
-                      </h2>
-                      <p>{subtitle}</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      {selectedAlbum && (
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            setSelectedAlbum(null);
-                            setTracks([]);
-                          }}
-                        >
-                          ← Volver a álbumes
-                        </button>
-                      )}
-                      {selectedArtist && (
-                        <button
-                          type="button"
-                          className="primary"
-                          onClick={() => handleSelectArtist(selectedArtist)}
-                          disabled={loadingAlbums}
-                        >
-                          {loadingAlbums ? 'Actualizando...' : 'Actualizar lista'}
-                        </button>
-                      )}
-                    </div>
-                  </header>
-
                   {!selectedAlbum ? (
                     <>
-                      {loadingAlbums && <p>Cargando álbumes...</p>}
+                      <div className="artist-header">
+                        <div className="artist-header-content">
+                          <h1 className="artist-title">{selectedArtist?.name || 'Explora TruSoundCloud'}</h1>
+                          <p className="artist-subtitle">
+                            {albums.length} {albums.length === 1 ? 'álbum' : 'álbumes'} · {albums.reduce((sum, album) => sum + (album.track_count || 0), 0)} canciones
+                          </p>
+                        </div>
+                        {selectedArtist && (
+                          <button
+                            type="button"
+                            className="refresh-btn"
+                            onClick={() => handleSelectArtist(selectedArtist)}
+                            disabled={loadingAlbums}
+                            title="Actualizar"
+                          >
+                            <svg viewBox="0 0 24 24" width="20" height="20">
+                              <path
+                                d="M4 12a8 8 0 018-8V2l4 4-4 4V6a6 6 0 00-6 6M20 12a8 8 0 01-8 8v2l-4-4 4-4v4a6 6 0 006-6z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+
+                      {loadingAlbums && (
+                        <div className="loading-state">
+                          <p>Cargando álbumes...</p>
+                        </div>
+                      )}
                       {!loadingAlbums && albums.length === 0 && selectedArtist && (
-                        <p>Este artista no tiene álbumes disponibles.</p>
+                        <div className="empty-state">
+                          <p>Este artista no tiene álbumes disponibles.</p>
+                        </div>
                       )}
                       {!loadingAlbums && albums.length > 0 && (
-                        <div className="albums-panel">
-                          <h3>Álbumes</h3>
+                        <div className="albums-section">
+                          <h2 className="section-title">Álbumes</h2>
                           <div className="albums-grid">
                             {albums.map((album) => (
                               <AlbumCard
@@ -756,10 +751,39 @@ const TruSoundCloud = () => {
                     </>
                   ) : (
                     <>
+                      <div className="album-header">
+                        <button
+                          type="button"
+                          className="back-btn"
+                          onClick={() => {
+                            setSelectedAlbum(null);
+                            setTracks([]);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path
+                              d="M15 18l-6-6 6-6"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <span>Álbumes</span>
+                        </button>
+                        <div className="album-header-content">
+                          <h1 className="album-title">{selectedAlbum.name}</h1>
+                          <p className="album-subtitle">
+                            {selectedArtist?.name} · {tracks.length} {tracks.length === 1 ? 'canción' : 'canciones'}
+                          </p>
+                        </div>
+                      </div>
+
                       {myPlaylists.length > 0 && (
                         <div className="add-playlist-widget">
                           <label htmlFor="playlistSelect">
-                            Selecciona una playlist para añadir canciones:
+                            Añadir a playlist:
                           </label>
                           <select
                             id="playlistSelect"
@@ -1439,94 +1463,224 @@ const TruSoundCloud = () => {
           gap: 0.6rem;
         }
 
-        .albums-panel {
-          background: rgba(7,9,20,0.85);
-          border-radius: 20px;
-          border: 1px solid rgba(255,255,255,0.05);
-          padding: 1.2rem;
+        .artist-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        .albums-panel h3 {
-          margin: 0 0 1rem 0;
-          font-size: 1.1rem;
+        .artist-header-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .artist-title {
+          margin: 0 0 0.5rem 0;
+          font-size: clamp(2rem, 5vw, 4rem);
+          font-weight: 900;
           color: #fff;
+          letter-spacing: -0.02em;
+          line-height: 1.1;
+        }
+
+        .artist-subtitle {
+          margin: 0;
+          font-size: 0.95rem;
+          color: rgba(255,255,255,0.7);
+          font-weight: 400;
+        }
+
+        .refresh-btn {
+          background: rgba(255,255,255,0.1);
+          border: none;
+          border-radius: 50%;
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .refresh-btn:hover {
+          background: rgba(255,255,255,0.2);
+          transform: scale(1.05);
+        }
+
+        .refresh-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .album-header {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .back-btn {
+          background: transparent;
+          border: none;
+          color: rgba(255,255,255,0.7);
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          padding: 0.5rem;
+          border-radius: 8px;
+          transition: all 0.2s ease;
+          font-size: 0.95rem;
+          font-weight: 500;
+        }
+
+        .back-btn:hover {
+          color: #fff;
+          background: rgba(255,255,255,0.1);
+        }
+
+        .album-header-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .album-title {
+          margin: 0 0 0.25rem 0;
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: -0.01em;
+        }
+
+        .album-subtitle {
+          margin: 0;
+          font-size: 0.9rem;
+          color: rgba(255,255,255,0.7);
+        }
+
+        .section-title {
+          margin: 0 0 1.5rem 0;
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: -0.01em;
+        }
+
+        .albums-section {
+          margin-top: 0;
         }
 
         .albums-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 1.25rem;
         }
 
         .album-card {
-          border: 1px solid rgba(255,255,255,0.06);
+          background: transparent;
+          border: none;
           text-align: left;
-          padding: 1rem;
-          border-radius: 16px;
-          background: rgba(9,9,20,0.8);
+          padding: 0;
+          border-radius: 0;
           color: #e5e7eb;
           cursor: pointer;
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
-          transition: transform 0.15s ease-out, border 0.15s ease-out, box-shadow 0.15s ease-out;
+          transition: transform 0.2s ease;
           width: 100%;
         }
 
-        .album-card.active,
         .album-card:hover {
-          border-color: rgba(255,255,255,0.35);
-          box-shadow: 0 15px 35px rgba(4,7,15,0.8);
-          transform: translateY(-2px);
-          background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+          transform: translateY(-4px);
+        }
+
+        .album-card.active .album-artwork {
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
 
         .album-artwork {
           width: 100%;
           aspect-ratio: 1;
-          border-radius: 14px;
+          border-radius: 8px;
           background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: 700;
-          font-size: 2rem;
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
           color: #020617;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          transition: box-shadow 0.2s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .album-artwork::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.1) 100%);
         }
 
         .album-info {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          min-height: 3.5rem;
         }
 
         .album-info h4 {
           margin: 0;
-          font-size: 1rem;
+          font-size: 0.95rem;
           color: #fff;
           font-weight: 600;
+          line-height: 1.3;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
 
         .album-info p {
           margin: 0;
-          font-size: 0.85rem;
-          color: rgba(226,232,240,0.7);
+          font-size: 0.875rem;
+          color: rgba(255,255,255,0.6);
+          font-weight: 400;
+        }
+
+        .loading-state,
+        .empty-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: rgba(255,255,255,0.6);
         }
 
         .track-row {
           display: grid;
-          grid-template-columns: auto minmax(0, 1.2fr) auto auto;
+          grid-template-columns: auto minmax(0, 1fr) auto auto;
           align-items: center;
-          gap: 0.8rem;
-          padding: 0.8rem 1rem;
-          border-radius: 16px;
-          border: 1px solid rgba(255,255,255,0.05);
-          background: rgba(7,11,26,0.8);
-          transition: transform 0.15s ease, border 0.15s ease;
+          gap: 1rem;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          border: none;
+          background: transparent;
+          transition: background 0.15s ease;
+        }
+        .track-row:hover {
+          background: rgba(255,255,255,0.05);
         }
         .track-row.active {
-          border-color: rgba(255,255,255,0.4);
-          background: rgba(255,255,255,0.07);
+          background: rgba(255,255,255,0.08);
         }
 
         .play-btn {
@@ -1600,28 +1754,42 @@ const TruSoundCloud = () => {
 
         .track-actions {
           display: flex;
-          gap: 0.35rem;
+          gap: 0.5rem;
+          align-items: center;
+          flex-shrink: 0;
         }
 
         .icon-btn {
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.2);
-          background: rgba(10,12,22,0.8);
-          color: #e5e7eb;
-          padding: 0.25rem 0.55rem;
+          border-radius: 50%;
+          border: none;
+          background: transparent;
+          color: rgba(255,255,255,0.7);
+          width: 36px;
+          height: 36px;
+          min-width: 36px;
+          padding: 0;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          transition: transform 0.1s ease, border 0.15s ease;
+          transition: all 0.2s ease;
+          opacity: 0;
+        }
+        .track-row:hover .icon-btn,
+        .track-row.active .icon-btn {
+          opacity: 1;
         }
         .icon-btn:hover {
-          transform: translateY(-1px);
-          border-color: rgba(255,255,255,0.4);
+          background: rgba(255,255,255,0.1);
+          color: #fff;
+          transform: scale(1.1);
         }
         .icon-btn.heart.active {
-          border-color: #fb7185;
-          color: #fb7185;
+          color: #1db954;
+          opacity: 1;
+        }
+        .icon-btn.heart.active:hover {
+          color: #1ed760;
         }
 
         .favorites-panel,
@@ -1683,8 +1851,18 @@ const TruSoundCloud = () => {
         .add-playlist-widget {
           display: flex;
           flex-direction: column;
-          gap: 0.4rem;
-          margin-top: 0.9rem;
+          gap: 0.5rem;
+          margin-bottom: 1.5rem;
+          padding: 1rem;
+          background: rgba(255,255,255,0.05);
+          border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .add-playlist-widget label {
+          font-size: 0.875rem;
+          color: rgba(255,255,255,0.8);
+          font-weight: 500;
         }
 
         .player-bar {
@@ -1898,8 +2076,9 @@ const TruSoundCloud = () => {
             right: 0;
             bottom: 0;
             width: 100%;
-            border-radius: 20px 20px 0 0;
-            padding: 0.75rem 1rem 1rem;
+            border-radius: 0;
+            padding: 0.75rem 1rem;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
@@ -1909,6 +2088,8 @@ const TruSoundCloud = () => {
             border-left: none;
             border-right: none;
             border-bottom: none;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            box-sizing: border-box;
           }
 
           .mini-left {
@@ -1917,6 +2098,7 @@ const TruSoundCloud = () => {
             align-items: center;
             min-width: 0;
             width: 100%;
+            flex-shrink: 0;
           }
 
           .artwork-chip {
@@ -1932,6 +2114,7 @@ const TruSoundCloud = () => {
             display: flex;
             flex-direction: column;
             gap: 0.2rem;
+            overflow: hidden;
           }
 
           .track-meta strong {
@@ -1958,30 +2141,57 @@ const TruSoundCloud = () => {
             display: flex;
             flex-direction: row;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: center;
+            gap: 0.75rem;
             width: 100%;
+            flex-shrink: 0;
+            padding: 0;
           }
 
           .control-btn {
-            width: 44px;
-            height: 44px;
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            min-height: 48px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             border: 1px solid rgba(255,255,255,0.2);
-            background: rgba(15,23,42,0.8);
+            background: rgba(15,23,42,0.9);
             color: #e5e7eb;
             cursor: pointer;
             flex-shrink: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: visible;
+          }
+
+          .control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
           }
 
           .control-btn.primary-btn {
-            width: 50px;
-            height: 50px;
+            width: 56px;
+            height: 56px;
+            min-width: 56px;
+            min-height: 56px;
             background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
             border: none;
             color: #020617;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          }
+
+          .control-btn svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+          }
+
+          .control-btn.primary-btn svg {
+            width: 22px;
+            height: 22px;
           }
 
           .progress-group {
@@ -1990,6 +2200,8 @@ const TruSoundCloud = () => {
             gap: 0.5rem;
             width: 100%;
             order: -1;
+            flex-shrink: 0;
+            padding: 0;
           }
 
           .progress-group span {
@@ -1998,33 +2210,81 @@ const TruSoundCloud = () => {
             min-width: 2.5rem;
             text-align: center;
             font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
           }
 
           .progress-group input[type="range"] {
             flex: 1;
             height: 4px;
             accent-color: var(--accent-1);
+            min-width: 0;
           }
 
           .track-row {
-            grid-template-columns: auto minmax(0, 1fr);
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            padding: 0.5rem 0.5rem;
           }
 
           .track-meta {
-            justify-content: flex-start;
+            display: none;
+          }
+
+          .track-actions {
+            gap: 0.25rem;
+          }
+
+          .icon-btn {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
           }
 
           .content {
             padding-bottom: 6rem;
           }
 
-          .albums-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 0.75rem;
+          .artist-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
           }
 
-          .album-card {
-            padding: 0.85rem;
+          .artist-title {
+            font-size: 2rem;
+          }
+
+          .refresh-btn {
+            width: 40px;
+            height: 40px;
+            align-self: flex-end;
+          }
+
+          .album-header {
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+          }
+
+          .back-btn {
+            font-size: 0.875rem;
+            padding: 0.4rem;
+          }
+
+          .album-title {
+            font-size: 1.5rem;
+          }
+
+          .section-title {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+          }
+
+          .albums-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 1rem;
           }
 
           .album-artwork {
@@ -2032,11 +2292,49 @@ const TruSoundCloud = () => {
           }
 
           .album-info h4 {
-            font-size: 0.9rem;
+            font-size: 0.875rem;
+            min-height: 2.5rem;
           }
 
           .album-info p {
             font-size: 0.8rem;
+          }
+
+          .track-row {
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: 0.75rem;
+            padding: 0.6rem 0.75rem;
+          }
+
+          .track-actions {
+            gap: 0.25rem;
+            flex-shrink: 0;
+          }
+
+          .icon-btn {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            opacity: 1;
+          }
+
+          .track-row:hover .icon-btn,
+          .track-row.active .icon-btn {
+            opacity: 1;
+          }
+
+          .add-playlist-widget {
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+          }
+
+          .add-playlist-widget label {
+            font-size: 0.8rem;
+          }
+
+          .add-playlist-widget select {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
           }
         }
 
