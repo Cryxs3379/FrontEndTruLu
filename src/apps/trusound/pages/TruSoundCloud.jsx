@@ -2147,7 +2147,7 @@ const TruSoundCloud = () => {
 
         @media (max-width: 768px) {
           .trusound-page {
-            padding-bottom: 6rem;
+            padding-bottom: 0;
           }
 
           .mobile-artists-btn {
@@ -2156,23 +2156,32 @@ const TruSoundCloud = () => {
 
           .content {
             padding: 1rem;
-            padding-bottom: 6rem;
+            padding-bottom: calc(180px + env(safe-area-inset-bottom) + 56px);
+            margin-bottom: 0;
+          }
+
+          .track-info {
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
           }
 
           .track-info h5 {
             font-size: 0.875rem;
             line-height: 1.4;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
             word-break: break-word;
+            margin: 0;
           }
 
           .track-info small {
-            font-size: 0.75rem;
-            margin-top: 0.15rem;
+            font-size: 0.7rem;
+            margin-top: 0.1rem;
+            opacity: 0.8;
           }
 
           .player-bar {
@@ -2183,7 +2192,7 @@ const TruSoundCloud = () => {
             width: 100%;
             border-radius: 0;
             padding: 0.875rem 1rem;
-            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            padding-bottom: calc(0.875rem + env(safe-area-inset-bottom) + 56px);
             display: flex;
             flex-direction: column;
             gap: 0.875rem;
@@ -2193,6 +2202,7 @@ const TruSoundCloud = () => {
             border-top: 1px solid rgba(255,255,255,0.1);
             box-sizing: border-box;
             z-index: 1000;
+            min-height: calc(140px + env(safe-area-inset-bottom) + 56px);
           }
 
           .mini-left {
@@ -2355,8 +2365,10 @@ const TruSoundCloud = () => {
 
           .track-row {
             grid-template-columns: auto minmax(0, 1fr) auto;
-            padding: 0.75rem 0.75rem;
+            padding: 0.875rem 0.75rem;
             gap: 0.75rem;
+            min-height: 60px;
+            align-items: center;
           }
 
           .track-meta {
@@ -2365,13 +2377,18 @@ const TruSoundCloud = () => {
 
           .track-actions {
             gap: 0.5rem;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
           }
 
           .icon-btn {
             width: 40px;
             height: 40px;
             min-width: 40px;
+            min-height: 40px;
             opacity: 1;
+            flex-shrink: 0;
           }
 
           .artist-title {
@@ -2406,10 +2423,6 @@ const TruSoundCloud = () => {
 
           .album-info p {
             font-size: 0.8rem;
-          }
-
-          .content {
-            padding-bottom: 6rem;
           }
 
           .artist-header {
@@ -2467,29 +2480,6 @@ const TruSoundCloud = () => {
 
           .album-info p {
             font-size: 0.8rem;
-          }
-
-          .track-row {
-            grid-template-columns: auto minmax(0, 1fr) auto;
-            gap: 0.75rem;
-            padding: 0.6rem 0.75rem;
-          }
-
-          .track-actions {
-            gap: 0.25rem;
-            flex-shrink: 0;
-          }
-
-          .icon-btn {
-            width: 32px;
-            height: 32px;
-            min-width: 32px;
-            opacity: 1;
-          }
-
-          .track-row:hover .icon-btn,
-          .track-row.active .icon-btn {
-            opacity: 1;
           }
 
           .add-playlist-widget {
