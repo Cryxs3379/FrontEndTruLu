@@ -2168,7 +2168,7 @@ const TruSoundCloud = () => {
 
           .content {
             padding: 1rem;
-            padding-bottom: calc(120px + env(safe-area-inset-bottom));
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
             margin-bottom: 0;
           }
 
@@ -2198,23 +2198,21 @@ const TruSoundCloud = () => {
 
           .player-bar {
             position: fixed !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            max-width: 100vw !important;
-            border-radius: 0;
-            padding: 0.75rem 0.875rem;
-            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+            left: 0.75rem !important;
+            right: 0.75rem !important;
+            bottom: 0.75rem !important;
+            width: auto !important;
+            max-width: calc(100vw - 1.5rem) !important;
+            border-radius: 16px !important;
+            padding: 0.625rem 0.875rem;
+            padding-bottom: calc(0.625rem + env(safe-area-inset-bottom));
             display: flex;
-            flex-direction: column;
-            gap: 0.625rem;
-            align-items: stretch;
-            box-shadow: 0 -8px 24px rgba(2,6,23,0.8);
+            flex-direction: row;
+            gap: 0.75rem;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
             backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255,255,255,0.1);
-            border-left: none !important;
-            border-right: none !important;
+            border: 1px solid rgba(255,255,255,0.1);
             box-sizing: border-box;
             z-index: 1000;
             transform: none !important;
@@ -2226,15 +2224,16 @@ const TruSoundCloud = () => {
             gap: 0.625rem;
             align-items: center;
             min-width: 0;
-            width: 100%;
-            flex-shrink: 0;
+            flex: 1;
+            flex-shrink: 1;
+            overflow: hidden;
           }
 
           .artwork-chip {
-            width: 44px;
-            height: 44px;
+            width: 40px;
+            height: 40px;
             flex-shrink: 0;
-            border-radius: 10px;
+            border-radius: 8px;
           }
 
           .track-meta {
@@ -2253,11 +2252,12 @@ const TruSoundCloud = () => {
             text-overflow: ellipsis;
             line-height: 1.2;
             font-weight: 600;
+            color: #fff;
           }
 
           .track-meta span {
             font-size: 0.6875rem;
-            color: rgba(255,255,255,0.7);
+            color: rgba(255,255,255,0.6);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2271,18 +2271,17 @@ const TruSoundCloud = () => {
             display: flex;
             flex-direction: row;
             align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            width: 100%;
+            justify-content: flex-end;
+            gap: 0.5rem;
             flex-shrink: 0;
             padding: 0;
           }
 
           .control-btn {
-            width: 44px;
-            height: 44px;
-            min-width: 44px;
-            min-height: 44px;
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            min-height: 36px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
@@ -2309,44 +2308,29 @@ const TruSoundCloud = () => {
           }
 
           .control-btn.primary-btn {
-            width: 52px;
-            height: 52px;
-            min-width: 52px;
-            min-height: 52px;
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            min-height: 44px;
             background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
             border: none;
             color: #020617;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
           }
 
           .control-btn svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             flex-shrink: 0;
           }
 
           .control-btn.primary-btn svg {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
           }
 
           .progress-group {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            width: 100%;
-            order: -1;
-            flex-shrink: 0;
-            padding: 0;
-          }
-
-          .progress-group span {
-            font-size: 0.65rem;
-            color: rgba(226,232,240,0.8);
-            min-width: 2.2rem;
-            text-align: center;
-            font-variant-numeric: tabular-nums;
-            flex-shrink: 0;
+            display: none;
           }
 
           .progress-group input[type="range"] {
