@@ -111,6 +111,7 @@ const TruSoundCloud = () => {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const userInteractionRef = useRef(false);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -136,38 +137,79 @@ const TruSoundCloud = () => {
     const audio = audioRef.current;
     if (!audio) return;
     
-    // Resetear estado cuando cambia la URL
-    setIsPlaying(false);
+    // NO resetear el estado aquí - dejar que los event listeners lo manejen
+    // Esto evita conflictos con autoPlay en móviles
+    // El userInteractionRef se usa para evitar que handleCanPlay y handleLoadedData
+    // reseteen el estado cuando el usuario está haciendo clic en play
     
     const handleTimeUpdate = () => {
       setProgress(audio.currentTime || 0);
       setDuration(audio.duration || 0);
     };
+    
     const handlePlay = () => {
       setIsPlaying(true);
     };
+    
     const handlePause = () => {
       setIsPlaying(false);
     };
+    
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+    
     const handleLoadedData = () => {
-      // Cuando se carga el audio, verificar el estado real
+      // Sincronizar estado cuando el audio está listo
+      // Solo actualizar si el audio realmente está reproduciéndose y tiene datos cargados
+      // NO resetear si hay interacción del usuario activa (evita conflictos en móviles)
+      if (userInteractionRef.current) {
+        // Si el usuario está interactuando, dejar que los eventos play/pause manejen el estado
+        return;
+      }
+      if (!audio.paused && audio.readyState >= 2) {
+        setIsPlaying(true);
+      } else if (audio.paused) {
+        // Asegurar que si está pausado, el estado también lo refleje
+        setIsPlaying(false);
+      }
+    };
+    
+    const handleCanPlay = () => {
+      // Cuando el audio puede reproducirse, verificar estado real
+      // NO resetear si hay interacción del usuario activa (evita conflictos en móviles)
+      if (userInteractionRef.current) {
+        // Si el usuario está interactuando, dejar que los eventos play/pause manejen el estado
+        return;
+      }
+      // Solo sincronizar si no hay interacción del usuario
       setIsPlaying(!audio.paused);
     };
     
+    const handleError = () => {
+      setIsPlaying(false);
+    };
+    
+    // Añadir todos los listeners
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleTimeUpdate);
     audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', () => setIsPlaying(false));
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     
+    // Cleanup
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleTimeUpdate);
       audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', () => setIsPlaying(false));
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
   }, [audioUrl]);
 
@@ -309,10 +351,18 @@ const TruSoundCloud = () => {
   const playTrackAtIndex = (index, queue = playQueue) => {
     if (!queue || index < 0 || index >= queue.length) return;
     const nextTrack = queue[index];
+    // Marcar que hay interacción del usuario (para evitar que handleCanPlay interfiera)
+    userInteractionRef.current = true;
+    // Resetear estado ANTES de cambiar la URL para evitar conflictos
+    setIsPlaying(false);
     setPlayQueue(queue);
     setCurrentIndex(index);
     setCurrentTrack(nextTrack);
     setAudioUrl(buildTrackStreamUrl(nextTrack.id));
+    // Resetear la bandera después de un delay (el autoPlay se encargará de reproducir)
+    setTimeout(() => {
+      userInteractionRef.current = false;
+    }, 1000);
   };
 
   const handlePlayFromList = (list, index) => {
@@ -344,33 +394,52 @@ const TruSoundCloud = () => {
   const togglePlayback = async () => {
     if (!audioRef.current) return;
     
-    // Usar el estado actual y el estado real del audio para determinar la acción
-    const shouldPlay = audioRef.current.paused && !isPlaying;
+    // Marcar que hay interacción del usuario
+    userInteractionRef.current = true;
     
     try {
-      if (shouldPlay) {
-        await audioRef.current.play();
-        setIsPlaying(true);
+      // Verificar el estado real del audio (más confiable que el estado React)
+      if (audioRef.current.paused) {
+        // Intentar reproducir - los event listeners actualizarán isPlaying
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          // El evento 'play' se disparará y actualizará isPlaying automáticamente
+          setIsPlaying(true);
+        }
       } else {
+        // Pausar - los event listeners actualizarán isPlaying
         audioRef.current.pause();
+        // El evento 'pause' se disparará y actualizará isPlaying automáticamente
         setIsPlaying(false);
       }
     } catch (error) {
       console.error('Error al reproducir/pausar:', error);
-      // Si falla el play, intentar de nuevo después de un pequeño delay
-      if (shouldPlay) {
+      // Si falla, sincronizar el estado con el estado real del audio
+      const wasPaused = audioRef.current.paused;
+      setIsPlaying(!wasPaused);
+      
+      // En móviles, a veces el play() falla por políticas del navegador
+      // Intentar una vez más después de un pequeño delay
+      if (wasPaused) {
         setTimeout(async () => {
           try {
             if (audioRef.current && audioRef.current.paused) {
               await audioRef.current.play();
               setIsPlaying(true);
             }
-        } catch (retryError) {
-          console.error('Error al reintentar reproducir:', retryError);
-          setIsPlaying(false);
-        }
-        }, 100);
+          } catch (retryError) {
+            console.error('Error al reintentar reproducir:', retryError);
+            setIsPlaying(false);
+          }
+        }, 150);
       }
+    } finally {
+      // Resetear la bandera después de un delay más largo
+      // Esto da tiempo a que el audio empiece a reproducirse en móviles
+      setTimeout(() => {
+        userInteractionRef.current = false;
+      }, 1000);
     }
   };
 
@@ -1328,10 +1397,18 @@ const TruSoundCloud = () => {
             src={audioUrl}
             autoPlay
             preload="metadata"
+            playsInline
             onEnded={handleNextTrack}
             onError={(e) => {
               console.error('Error en audio:', e);
               setIsPlaying(false);
+            }}
+            onLoadStart={() => {
+              // Cuando empieza a cargar una nueva canción, resetear estado solo si no hay interacción del usuario
+              // Esto evita resetear cuando el usuario está haciendo clic en play
+              if (!userInteractionRef.current && audioRef.current && audioRef.current.paused) {
+                setIsPlaying(false);
+              }
             }}
             style={{ display: 'none' }}
           />
