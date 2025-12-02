@@ -1947,21 +1947,33 @@ const TruSoundCloud = () => {
 
         .player-bar {
           position: fixed;
-          left: 50%;
-          transform: translateX(-50%);
-          bottom: 1rem;
-          width: min(960px, calc(100% - 1.2rem));
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          max-width: 100vw;
           background: rgba(1,3,10,0.95);
           backdrop-filter: blur(20px);
           border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 20px;
+          border-radius: 20px 20px 0 0;
           padding: 0.9rem 1.3rem;
           display: flex;
           justify-content: space-between;
           gap: 1rem;
           align-items: center;
           box-shadow: 0 25px 50px rgba(2,6,23,0.9);
-          z-index: 45;
+          z-index: 1000;
+          box-sizing: border-box;
+        }
+
+        @media (min-width: 1024px) {
+          .player-bar {
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 1rem;
+            width: min(960px, calc(100vw - 2.4rem));
+            border-radius: 20px;
+          }
         }
 
         .mini-left {
@@ -2185,11 +2197,12 @@ const TruSoundCloud = () => {
           }
 
           .player-bar {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100%;
+            position: fixed !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
             border-radius: 0;
             padding: 0.875rem 1rem;
             padding-bottom: calc(0.875rem + env(safe-area-inset-bottom) + 56px);
@@ -2200,9 +2213,12 @@ const TruSoundCloud = () => {
             box-shadow: 0 -8px 24px rgba(2,6,23,0.8);
             backdrop-filter: blur(20px);
             border-top: 1px solid rgba(255,255,255,0.1);
+            border-left: none !important;
+            border-right: none !important;
             box-sizing: border-box;
             z-index: 1000;
             min-height: calc(140px + env(safe-area-inset-bottom) + 56px);
+            transform: none !important;
           }
 
           .mini-left {
