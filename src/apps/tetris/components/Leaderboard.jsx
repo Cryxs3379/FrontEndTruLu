@@ -58,29 +58,69 @@ const Leaderboard = ({ refreshToken = 0 }) => {
   useEffect(() => {
     let isMounted = true;
     const fetchScores = async () => {
+      console.log('🎮 [Leaderboard] useEffect ejecutado, refreshToken:', refreshToken);
       setLoading(true);
       setError(null);
+      console.log('🔄 [Leaderboard] Iniciando carga de scores...');
+      
       try {
         const data = await getLeaderboard();
+        console.log('📦 [Leaderboard] Datos recibidos del API:', data);
+        console.log('📦 [Leaderboard] Tipo de datos:', Array.isArray(data) ? 'Array' : typeof data);
+        
         if (isMounted) {
-          setScores(data.slice(0, 10));
+          const slicedData = Array.isArray(data) ? data.slice(0, 10) : [];
+          console.log('✅ [Leaderboard] Actualizando scores con:', slicedData);
+          console.log('✅ [Leaderboard] Cantidad de scores a mostrar:', slicedData.length);
+          setScores(slicedData);
+        } else {
+          console.warn('⚠️ [Leaderboard] Componente desmontado, no actualizando estado');
         }
       } catch (err) {
-        console.error('Error fetching scores:', err);
+        console.error('❌ [Leaderboard] Error al obtener scores:', err);
+        console.error('❌ [Leaderboard] Error message:', err.message);
+        console.error('❌ [Leaderboard] Error stack:', err.stack);
+        console.error('❌ [Leaderboard] Error completo:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        });
+        
         if (isMounted) {
           setError('Error al cargar el ranking. Intenta de nuevo.');
           setScores([]);
+          console.log('⚠️ [Leaderboard] Estado de error actualizado');
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          console.log('🏁 [Leaderboard] Carga finalizada');
+        }
       }
     };
 
     fetchScores();
     return () => {
+      console.log('🧹 [Leaderboard] Cleanup: desmontando componente');
       isMounted = false;
     };
   }, [refreshToken]);
+
+  // Log del estado actual para debugging
+  console.log('🎨 [Leaderboard] Render - Estado actual:', {
+    loading,
+    error,
+    scoresLength: scores.length,
+    scores: scores
+  });
+
+  // Log antes de renderizar las entradas
+  if (!loading && !error && scores.length > 0) {
+    console.log('📊 [Leaderboard] Renderizando', scores.length, 'entradas');
+    scores.forEach((entry, i) => {
+      console.log(`📝 [Leaderboard] Entrada ${i + 1}:`, entry);
+    });
+  }
 
   return (
     <BoardContainer>
